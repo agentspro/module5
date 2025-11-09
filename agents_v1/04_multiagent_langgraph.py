@@ -30,10 +30,10 @@ load_dotenv()
 # ============================================================================
 
 if os.getenv("LANGCHAIN_TRACING_V2") == "true":
-    print("✅ LangSmith трейсинг активний для мультиагентної системи")
-    print(f"📊 Project: {os.getenv('LANGCHAIN_PROJECT', 'default')}\n")
+    print("OK LangSmith трейсинг активний для мультиагентної системи")
+    print(f"Stats: Project: {os.getenv('LANGCHAIN_PROJECT', 'default')}\n")
 else:
-    print("⚠️  LangSmith не ввімкнений\n")
+    print("WARNING  LangSmith не ввімкнений\n")
 
 
 # ============================================================================
@@ -144,7 +144,7 @@ documents = [
     ),
 ]
 
-print(f"📚 Knowledge Base: {len(documents)} документів про LangGraph 1.0\n")
+print(f"KB: Knowledge Base: {len(documents)} документів про LangGraph 1.0\n")
 
 # ============================================================================
 # VECTOR STORE SETUP
@@ -157,7 +157,7 @@ retriever = vectorstore.as_retriever(
     search_kwargs={"k": 3}  # Топ-3 документи
 )
 
-print("✅ Vector store готовий (FAISS)\n")
+print("OK Vector store готовий (FAISS)\n")
 
 # ============================================================================
 # LLM SETUP
@@ -198,7 +198,7 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
     - Визначає коли завершити роботу
     """
     print("\n" + "="*70)
-    print("🎯 SUPERVISOR AGENT: Приймає рішення про делегування")
+    print("SUPERVISOR SUPERVISOR AGENT: Приймає рішення про делегування")
     print("="*70)
 
     iteration = state.get("iteration_count", 0) + 1
@@ -209,11 +209,11 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
     has_analysis = bool(state.get("analysis"))
     has_answer = bool(state.get("final_answer"))
 
-    print(f"📊 Iteration: {iteration}")
+    print(f"Stats: Iteration: {iteration}")
     print(f"📝 Question: {question}")
-    print(f"📚 Docs retrieved: {has_docs}")
-    print(f"🔍 Analysis done: {has_analysis}")
-    print(f"✅ Answer ready: {has_answer}")
+    print(f"KB: Docs retrieved: {has_docs}")
+    print(f"RESEARCHER Analysis done: {has_analysis}")
+    print(f"OK Answer ready: {has_answer}")
 
     # Створюємо промпт для supervisor
     supervisor_prompt = f"""You are a Supervisor Agent coordinating a multi-agent research team.
@@ -250,7 +250,7 @@ What's the next step?"""
     structured_llm = llm.with_structured_output(SupervisorDecision)
     decision = structured_llm.invoke(messages)
 
-    print(f"\n🎯 Decision: {decision.next_agent}")
+    print(f"\nSUPERVISOR Decision: {decision.next_agent}")
     print(f"💭 Reasoning: {decision.reasoning}\n")
 
     return {
@@ -271,7 +271,7 @@ def researcher_node(state: MultiAgentState) -> MultiAgentState:
     - Оцінює якість знайденої інформації
     """
     print("\n" + "="*70)
-    print("🔍 RESEARCHER AGENT: Шукає інформацію")
+    print("RESEARCHER RESEARCHER AGENT: Шукає інформацію")
     print("="*70)
 
     question = state["question"]
@@ -279,7 +279,7 @@ def researcher_node(state: MultiAgentState) -> MultiAgentState:
     # Виконуємо RAG retrieval
     retrieved_docs = retriever.invoke(question)
 
-    print(f"📚 Знайдено {len(retrieved_docs)} документів")
+    print(f"KB: Знайдено {len(retrieved_docs)} документів")
     for i, doc in enumerate(retrieved_docs, 1):
         print(f"  {i}. {doc.metadata.get('source', 'unknown')}: {doc.page_content[:100]}...")
 
@@ -296,8 +296,8 @@ Are these documents sufficient?"""
     structured_llm = llm.with_structured_output(ResearchQuality)
     quality = structured_llm.invoke([HumanMessage(content=quality_prompt)])
 
-    print(f"\n✅ Quality: {'Sufficient' if quality.is_sufficient else 'Insufficient'}")
-    print(f"🎯 Confidence: {quality.confidence:.2f}")
+    print(f"\nOK Quality: {'Sufficient' if quality.is_sufficient else 'Insufficient'}")
+    print(f"SUPERVISOR Confidence: {quality.confidence:.2f}")
     print(f"💭 Reasoning: {quality.reasoning}\n")
 
     return {
@@ -317,14 +317,14 @@ def analyzer_node(state: MultiAgentState) -> MultiAgentState:
     - Структурує інформацію
     """
     print("\n" + "="*70)
-    print("🔬 ANALYZER AGENT: Аналізує інформацію")
+    print("ANALYZER ANALYZER AGENT: Аналізує інформацію")
     print("="*70)
 
     question = state["question"]
     docs = state.get("retrieved_docs", [])
 
     if not docs:
-        print("⚠️  No documents to analyze")
+        print("WARNING  No documents to analyze")
         return {
             **state,
             "analysis": "No documents found for analysis",
@@ -332,12 +332,18 @@ def analyzer_node(state: MultiAgentState) -> MultiAgentState:
         }
 
     # Аналізуємо документи
+    newline = chr(10)
+    docs_text = newline.join([
+        f"{i+1}. Source: {doc.metadata.get('source', 'unknown')}{newline}{doc.page_content}{newline}"
+        for i, doc in enumerate(docs)
+    ])
+
     analysis_prompt = f"""Analyze the following documents and extract key insights to answer the question.
 
 Question: {question}
 
 Documents:
-{chr(10).join([f"{i+1}. Source: {doc.metadata.get('source', 'unknown')}\\n{doc.page_content}\\n" for i, doc in enumerate(docs)])}
+{docs_text}
 
 Provide a structured analysis with:
 1. Key concepts found
@@ -353,7 +359,7 @@ Provide a structured analysis with:
     response = llm.invoke(messages)
     analysis = response.content
 
-    print(f"📊 Analysis:\n{analysis[:300]}...\n")
+    print(f"Stats: Analysis:\n{analysis[:300]}...\n")
 
     return {
         **state,
@@ -372,7 +378,7 @@ def synthesizer_node(state: MultiAgentState) -> MultiAgentState:
     - Структурує результат для користувача
     """
     print("\n" + "="*70)
-    print("🎨 SYNTHESIZER AGENT: Створює фінальну відповідь")
+    print("SYNTHESIZER SYNTHESIZER AGENT: Створює фінальну відповідь")
     print("="*70)
 
     question = state["question"]
@@ -405,7 +411,7 @@ Create a clear, informative answer that:
     response = llm.invoke(messages)
     final_answer = response.content
 
-    print(f"✅ Final Answer:\n{final_answer[:300]}...\n")
+    print(f"OK Final Answer:\n{final_answer[:300]}...\n")
 
     return {
         **state,
@@ -448,7 +454,7 @@ def create_multiagent_system():
             (повертається до supervisor після кожного агента)
     """
     print("=" * 70)
-    print("🏗️  СТВОРЕННЯ МУЛЬТИАГЕНТНОЇ СИСТЕМИ")
+    print("BUILDING  СТВОРЕННЯ МУЛЬТИАГЕНТНОЇ СИСТЕМИ")
     print("=" * 70 + "\n")
 
     # Створюємо StateGraph
@@ -484,12 +490,12 @@ def create_multiagent_system():
     checkpointer = MemorySaver()
     app = workflow.compile(checkpointer=checkpointer)
 
-    print("✅ Мультиагентна система створена\n")
+    print("OK Мультиагентна система створена\n")
     print("Agents:")
-    print("  🎯 Supervisor - координує команду")
-    print("  🔍 Researcher - RAG-пошук")
-    print("  🔬 Analyzer - аналіз інформації")
-    print("  🎨 Synthesizer - синтез відповіді\n")
+    print("  SUPERVISOR Supervisor - координує команду")
+    print("  RESEARCHER Researcher - RAG-пошук")
+    print("  ANALYZER Analyzer - аналіз інформації")
+    print("  SYNTHESIZER Synthesizer - синтез відповіді\n")
 
     return app
 
@@ -539,10 +545,10 @@ def test_multiagent_system():
             final_state = app.get_state(config)
 
             print("\n" + "-" * 70)
-            print("📊 FINAL RESULT")
+            print("Stats: FINAL RESULT")
             print("-" * 70)
-            print(f"\n🎯 Question: {query}\n")
-            print(f"✅ Answer:\n{final_state.values.get('final_answer', 'No answer')}\n")
+            print(f"\nSUPERVISOR Question: {query}\n")
+            print(f"OK Answer:\n{final_state.values.get('final_answer', 'No answer')}\n")
             print(f"📈 Stats:")
             print(f"  - Iterations: {final_state.values.get('iteration_count', 0)}")
             print(f"  - Documents used: {len(final_state.values.get('retrieved_docs', []))}")
@@ -563,18 +569,18 @@ def test_multiagent_system():
 
 if __name__ == "__main__":
     print("\n")
-    print("🎯 LangGraph 1.0 - Multi-Agent System (Supervisor Pattern)")
+    print("SUPERVISOR LangGraph 1.0 - Multi-Agent System (Supervisor Pattern)")
     print("=" * 70)
     print()
     print("Features:")
-    print("  ✅ Supervisor Pattern - hierarchical coordination")
-    print("  ✅ 4 Specialized Agents (Supervisor, Researcher, Analyzer, Synthesizer)")
-    print("  ✅ RAG Integration - knowledge base search")
-    print("  ✅ StateGraph - centralized state management")
-    print("  ✅ Checkpointing - persistent state with MemorySaver")
-    print("  ✅ Conditional Routing - dynamic agent selection")
-    print("  ✅ LangSmith Tracing - full observability")
-    print("  ✅ Knowledge Base - LangGraph 1.0 documentation")
+    print("  OK Supervisor Pattern - hierarchical coordination")
+    print("  OK 4 Specialized Agents (Supervisor, Researcher, Analyzer, Synthesizer)")
+    print("  OK RAG Integration - knowledge base search")
+    print("  OK StateGraph - centralized state management")
+    print("  OK Checkpointing - persistent state with MemorySaver")
+    print("  OK Conditional Routing - dynamic agent selection")
+    print("  OK LangSmith Tracing - full observability")
+    print("  OK Knowledge Base - LangGraph 1.0 documentation")
     print()
     print("=" * 70 + "\n")
 
@@ -586,7 +592,7 @@ if __name__ == "__main__":
         test_multiagent_system()
 
         print("\n" + "=" * 70)
-        print("✅ ALL TESTS COMPLETED")
+        print("OK ALL TESTS COMPLETED")
         print("=" * 70)
         print("\n💡 Check LangSmith dashboard for full trace!")
         print("   https://smith.langchain.com/\n")

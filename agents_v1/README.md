@@ -16,24 +16,24 @@ All agents include **LangSmith tracing** for full observability.
 ## Features
 
 ### LangChain 1.0 (October 2025)
-- ✅ `create_agent()` - New unified agent creation API
-- ✅ Middleware architecture with three hooks
-- ✅ Stable APIs (no breaking changes until 2.0)
-- ✅ Production-ready patterns
+-  `create_agent()` - New unified agent creation API
+-  Middleware architecture with three hooks
+-  Stable APIs (no breaking changes until 2.0)
+-  Production-ready patterns
 
 ### LangGraph 1.0
-- ✅ StateGraph for complex orchestration
-- ✅ Checkpointing with MemorySaver
-- ✅ Conditional routing and loops
-- ✅ Thread-based conversation persistence
-- ✅ Supervisor Pattern for multi-agent coordination
-- ✅ Hierarchical agent teams
-- ✅ Shared state management across agents
+-  StateGraph for complex orchestration
+-  Checkpointing with MemorySaver
+-  Conditional routing and loops
+-  Thread-based conversation persistence
+-  Supervisor Pattern for multi-agent coordination
+-  Hierarchical agent teams
+-  Shared state management across agents
 
 ### LangSmith Integration
-- ✅ Automatic tracing for all agents
-- ✅ Cost tracking and latency analysis
-- ✅ Trace visualization for debugging
+-  Automatic tracing for all agents
+-  Cost tracking and latency analysis
+-  Trace visualization for debugging
 
 ## Setup
 
@@ -67,7 +67,7 @@ LANGCHAIN_PROJECT=langchain-v1-agents
 
 **Pattern:** Automatic Agent Orchestration
 ```
-User Query → Agent → Tool Selection → Tool Execution → Response
+User Query  Agent  Tool Selection  Tool Execution  Response
 ```
 
 **Tools:**
@@ -114,7 +114,7 @@ A 15% tip on 250 UAH is 37.50 UAH.
 
 **Pattern:** Agent with Middleware Hooks
 ```
-Request → before_model → [modify_model_request] → LLM Call → after_model → Response
+Request  before_model  [modify_model_request]  LLM Call  after_model  Response
 ```
 
 **Middleware Implementations:**
@@ -166,19 +166,19 @@ has been disabled for security reasons."
 
 **Pattern:** Agentic RAG with Query Rewriting
 ```
-User Query → Retrieve Docs → Grade Relevance
-    ↓ (if relevant)
-Generate Answer → END
-    ↓ (if irrelevant)
-Rewrite Query → Retrieve Again → Grade → ...
+User Query  Retrieve Docs  Grade Relevance
+     (if relevant)
+Generate Answer  END
+     (if irrelevant)
+Rewrite Query  Retrieve Again  Grade  ...
 ```
 
 **Graph Structure:**
 ```
-START → retrieve → grade → [decide]
-                    ↓
-           if relevant: generate → END
-           if irrelevant: rewrite → retrieve (loop)
+START  retrieve  grade  [decide]
+                    
+           if relevant: generate  END
+           if irrelevant: rewrite  retrieve (loop)
 ```
 
 **Run:**
@@ -251,17 +251,17 @@ config2 = {"configurable": {"thread_id": "conversation_2"}}
 
 **Pattern:** Supervisor coordinating specialized agents
 ```
-User Query → Supervisor → [Researcher → Supervisor → Analyzer → Supervisor → Synthesizer] → END
+User Query  Supervisor  [Researcher  Supervisor  Analyzer  Supervisor  Synthesizer]  END
 ```
 
 **Architecture:**
 ```
-START → Supervisor
-         ↓ (delegates to specialist)
+START  Supervisor
+          (delegates to specialist)
     [Researcher | Analyzer | Synthesizer]
-         ↓ (returns control)
+          (returns control)
       Supervisor (decides next step)
-         ↓
+         
       END (when complete)
 ```
 
@@ -272,25 +272,25 @@ python 04_multiagent_langgraph.py
 
 **Specialized Agents:**
 
-1. **SupervisorAgent** 🎯
+1. **SupervisorAgent** 
    - Coordinates team of specialists
    - Makes delegation decisions
    - Evaluates progress and determines completion
    - Uses structured output for routing logic
 
-2. **ResearcherAgent** 🔍
+2. **ResearcherAgent** 
    - RAG-based knowledge retrieval
    - Searches LangGraph 1.0 documentation
    - Evaluates quality of retrieved documents
    - Returns top-k relevant sources
 
-3. **AnalyzerAgent** 🔬
+3. **AnalyzerAgent** 
    - Analyzes retrieved information
    - Extracts key insights and patterns
    - Structures technical details
    - Identifies best practices
 
-4. **SynthesizerAgent** 🎨
+4. **SynthesizerAgent** 
    - Creates comprehensive final answer
    - Combines analysis with source docs
    - Formats response for readability
@@ -321,33 +321,33 @@ python 04_multiagent_langgraph.py
 ```
 Query: "What is the Supervisor Pattern in LangGraph 1.0?"
 
-🎯 SUPERVISOR: Decides to delegate to researcher
-  → Decision: researcher
-  → Reasoning: Need to find information first
+ SUPERVISOR: Decides to delegate to researcher
+   Decision: researcher
+   Reasoning: Need to find information first
 
-🔍 RESEARCHER: Searches knowledge base
-  → Found 3 documents about Supervisor Pattern
-  → Quality: Sufficient (confidence: 0.95)
+ RESEARCHER: Searches knowledge base
+   Found 3 documents about Supervisor Pattern
+   Quality: Sufficient (confidence: 0.95)
 
-🎯 SUPERVISOR: Delegates to analyzer
-  → Decision: analyzer
-  → Reasoning: Documents found, need analysis
+ SUPERVISOR: Delegates to analyzer
+   Decision: analyzer
+   Reasoning: Documents found, need analysis
 
-🔬 ANALYZER: Analyzes documents
-  → Extracted: Pattern definition, architecture, use cases
-  → Key concepts: hierarchical coordination, specialized agents
+ ANALYZER: Analyzes documents
+   Extracted: Pattern definition, architecture, use cases
+   Key concepts: hierarchical coordination, specialized agents
 
-🎯 SUPERVISOR: Delegates to synthesizer
-  → Decision: synthesizer
-  → Reasoning: Analysis ready, create final answer
+ SUPERVISOR: Delegates to synthesizer
+   Decision: synthesizer
+   Reasoning: Analysis ready, create final answer
 
-🎨 SYNTHESIZER: Creates comprehensive answer
-  → Combined analysis with source citations
-  → Formatted with examples and technical details
-  → Answer: [Detailed explanation of Supervisor Pattern]
+ SYNTHESIZER: Creates comprehensive answer
+   Combined analysis with source citations
+   Formatted with examples and technical details
+   Answer: [Detailed explanation of Supervisor Pattern]
 
-🎯 SUPERVISOR: Work complete
-  → Decision: FINISH
+ SUPERVISOR: Work complete
+   Decision: FINISH
 
 Stats:
   - Iterations: 4
@@ -371,17 +371,16 @@ class MultiAgentState(TypedDict):
 
 **Workflow Diagram:**
 ```
-┌──────────────┐
-│  Supervisor  │◄─────────┐
-└──────┬───────┘          │
-       │                  │
-   ┌───▼────┬─────┬──────┤
-   │        │     │      │
-┌──▼──┐  ┌─▼──┐ ┌▼───┐  │
-│Res. │  │Ana.│ │Syn.│  │
-└──┬──┘  └─┬──┘ └┬───┘  │
-   │       │     │      │
-   └───────┴─────┴──────┘
+                Supervisor
+                    |
+        +-----------+-----------+
+        |           |           |
+   Researcher   Analyzer   Synthesizer
+        |           |           |
+        +-----------+-----------+
+                    |
+                    v
+            (back to Supervisor)
 ```
 
 **Checkpointing:**
@@ -407,7 +406,7 @@ All agents automatically send traces to LangSmith when `LANGCHAIN_TRACING_V2=tru
 **View traces at:** https://smith.langchain.com
 
 **What's traced:**
-- Agent reasoning steps (Thought → Action → Observation)
+- Agent reasoning steps (Thought  Action  Observation)
 - Tool calls and results
 - LLM prompts and completions
 - Token usage and costs
@@ -417,13 +416,13 @@ All agents automatically send traces to LangSmith when `LANGCHAIN_TRACING_V2=tru
 **Example trace hierarchy:**
 ```
 AgentExecutor
-├─ LLM Call (Reasoning)
-├─ Tool: get_weather
-│  └─ Result: "Partly cloudy, 18°C"
-├─ LLM Call (Next action)
-├─ Tool: calculate
-│  └─ Result: "37.5"
-└─ LLM Call (Final answer)
+├- LLM Call (Reasoning)
+├- Tool: get_weather
+|  +- Result: "Partly cloudy, 18°C"
+├- LLM Call (Next action)
+├- Tool: calculate
+|  +- Result: "37.5"
++- LLM Call (Final answer)
 ```
 
 ## Architecture Patterns

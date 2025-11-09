@@ -22,13 +22,13 @@ load_dotenv()
 # LANGCHAIN_PROJECT=langchain-agents-v1
 
 if not os.getenv("LANGCHAIN_TRACING_V2"):
-    print("⚠️  LangSmith трейсинг не ввімкнено. Додайте в .env:")
+    print("WARNING  LangSmith трейсинг не ввімкнено. Додайте в .env:")
     print("LANGCHAIN_TRACING_V2=true")
     print("LANGCHAIN_API_KEY=your_key")
     print("LANGCHAIN_PROJECT=langchain-agents-v1\n")
 else:
-    print("✅ LangSmith трейсинг активний")
-    print(f"📊 Project: {os.getenv('LANGCHAIN_PROJECT', 'default')}\n")
+    print("OK LangSmith трейсинг активний")
+    print(f"Stats: Project: {os.getenv('LANGCHAIN_PROJECT', 'default')}\n")
 
 
 # ============================================================================
@@ -48,10 +48,10 @@ def get_weather(location: str) -> str:
     """
     # Mock implementation - в production це був би API виклик
     weather_db = {
-        "london": "🌧️ Rainy, 12°C",
-        "kyiv": "☀️ Sunny, 18°C",
-        "new york": "⛅ Partly cloudy, 15°C",
-        "tokyo": "🌸 Clear, 22°C",
+        "london": "Rainy Rainy, 12°C",
+        "kyiv": "Sunny Sunny, 18°C",
+        "new york": "Partly cloudy Partly cloudy, 15°C",
+        "tokyo": "Clear Clear, 22°C",
     }
 
     location_lower = location.lower()
@@ -108,7 +108,7 @@ def search_docs(query: str) -> str:
     results = []
     for topic, info in docs.items():
         if topic in query_lower or query_lower in info.lower():
-            results.append(f"📚 {topic.title()}: {info}")
+            results.append(f"KB: {topic.title()}: {info}")
 
     return "\n\n".join(results) if results else f"No documentation found for '{query}'"
 
@@ -128,7 +128,7 @@ def create_basic_agent():
     - Не потрібен AgentExecutor
     """
     print("=" * 70)
-    print("🤖 БАЗОВИЙ АГЕНТ - LangChain 1.0")
+    print("AGENT БАЗОВИЙ АГЕНТ - LangChain 1.0")
     print("=" * 70 + "\n")
 
     # 1. Список tools
@@ -216,11 +216,11 @@ def test_basic_agent():
                 print(f"Output: {result}\n")
 
         except Exception as e:
-            print(f"\n❌ Error: {e}\n")
+            print(f"\nERROR: Error: {e}\n")
             import traceback
             traceback.print_exc()
 
-        input("\n⏸️  Press Enter to continue to next test...\n")
+        input("\nPAUSE  Press Enter to continue to next test...\n")
 
 
 # ============================================================================
@@ -229,22 +229,22 @@ def test_basic_agent():
 
 if __name__ == "__main__":
     print("\n")
-    print("🎯 LangChain 1.0 - Basic Agent with LangSmith Tracing")
+    print("TARGET LangChain 1.0 - Basic Agent with LangSmith Tracing")
     print("=" * 70)
     print()
     print("Features:")
-    print("  ✅ create_agent - LangChain 1.0 API (October 2025)")
-    print("  ✅ Model as string parameter (not ChatOpenAI object)")
-    print("  ✅ Multiple tools (weather, calculator, docs)")
-    print("  ✅ Automatic optimal prompting")
-    print("  ✅ LangSmith automatic tracing")
-    print("  ✅ Direct agent invocation (no AgentExecutor)")
+    print("  OK create_agent - LangChain 1.0 API (October 2025)")
+    print("  OK Model as string parameter (not ChatOpenAI object)")
+    print("  OK Multiple tools (weather, calculator, docs)")
+    print("  OK Automatic optimal prompting")
+    print("  OK LangSmith automatic tracing")
+    print("  OK Direct agent invocation (no AgentExecutor)")
     print()
     print("=" * 70 + "\n")
 
     # Перевірка API ключів
     if not os.getenv("OPENAI_API_KEY"):
-        print("❌ ERROR: OPENAI_API_KEY not found in environment!")
+        print("ERROR: ERROR: OPENAI_API_KEY not found in environment!")
         print("Please set it in .env file")
         exit(1)
 
@@ -252,14 +252,14 @@ if __name__ == "__main__":
         test_basic_agent()
 
         print("\n" + "=" * 70)
-        print("✅ ALL TESTS COMPLETED")
+        print("OK ALL TESTS COMPLETED")
         print("=" * 70)
-        print("\n💡 Check LangSmith dashboard to see traces:")
+        print("\nTIP: Check LangSmith dashboard to see traces:")
         print("   https://smith.langchain.com/\n")
 
     except KeyboardInterrupt:
         print("\n\n⏹️  Tests interrupted by user")
     except Exception as e:
-        print(f"\n\n❌ Error: {e}")
+        print(f"\n\nERROR: Error: {e}")
         import traceback
         traceback.print_exc()
