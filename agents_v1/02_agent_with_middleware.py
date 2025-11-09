@@ -12,9 +12,8 @@ LangSmith Integration: Автоматично трейсить всі middleware
 
 import os
 from typing import Dict, Any, List
-from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
-from langchain.agents import create_agent, AgentExecutor
+from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from dotenv import load_dotenv
 import json
@@ -98,7 +97,7 @@ class LoggingMiddleware:
             "timestamp": datetime.now().isoformat(),
             "call_number": self.call_count,
             "event": "before_model",
-            "input_length": len(str(state.get("input", ""))),
+            "input_length": len(str(state.get("messages", ""))),
         }
 
         self.logs.append(log_entry)
@@ -187,11 +186,10 @@ class SecurityMiddleware:
                     tools = [t for t in tools if t.name != risky_tool]
 
                     # Додаємо warning до messages
-                    warning_msg = SystemMessage(content=f"""
-SECURITY WARNING: Tool '{risky_tool}' is blocked due to security policy.
-Inform user that this action requires manual approval.
-Suggest alternative safe actions.
-""")
+                    warning_msg = {
+                        "role": "system",
+                        "content": f"SECURITY WARNING: Tool '{risky_tool}' is blocked due to security policy. Inform user that this action requires manual approval. Suggest alternative safe actions."
+                    }
                     messages = [warning_msg] + messages
 
         print("✅ Security check complete\n")
@@ -245,7 +243,7 @@ class TokenLimitMiddleware:
     def before_model(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Перевіряє і обмежує token usage"""
 
-        input_text = str(state.get("input", ""))
+        input_text = str(state.get("messages", ""))
         estimated_tokens = len(input_text.split()) * 1.3  # Rough estimate
 
         print(f"\n💰 TOKEN MIDDLEWARE:")
@@ -265,12 +263,78 @@ class TokenLimitMiddleware:
 
 
 # ============================================================================
+# MIDDLEWARE AGENT WRAPPER - LangChain 1.0
+# ============================================================================
+
+class MiddlewareAgent:
+    """
+    Wrapper навколо create_agent який додає middleware functionality
+
+    LangChain 1.0 API: create_agent повертає готовий agent
+    Ми обгортаємо його invoke() методом для додавання middleware hooks
+    """
+
+    def __init__(self, model: str, tools: List, system_prompt: str, middlewares: List = None):
+        self.tools = tools
+        self.middlewares = middlewares or []
+
+        # Створюємо base agent через create_agent
+        self.agent = create_agent(
+            model=model,
+            tools=tools,
+            system_prompt=system_prompt
+        )
+
+    def invoke(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Викликає agent з middleware hooks
+
+        Flow:
+        1. before_model middlewares
+        2. modify_model_request middlewares
+        3. agent.invoke()
+        4. after_model middlewares
+        """
+
+        # Before model middlewares
+        for mw in self.middlewares:
+            if hasattr(mw, 'before_model'):
+                inputs = mw.before_model(inputs)
+
+        # Modify request middlewares
+        tools_to_use = self.tools
+        messages = inputs.get("messages", [])
+
+        for mw in self.middlewares:
+            if hasattr(mw, 'modify_model_request'):
+                modifications = mw.modify_model_request(
+                    tools=tools_to_use,
+                    messages=messages,
+                )
+                tools_to_use = modifications.get('tools', tools_to_use)
+                messages = modifications.get('messages', messages)
+
+        # Оновлюємо messages після middleware
+        modified_inputs = {**inputs, "messages": messages}
+
+        # Execute agent
+        result = self.agent.invoke(modified_inputs)
+
+        # After model middlewares
+        for mw in self.middlewares:
+            if hasattr(mw, 'after_model'):
+                inputs = mw.after_model(inputs, result)
+
+        return result
+
+
+# ============================================================================
 # СТВОРЕННЯ АГЕНТА З MIDDLEWARE
 # ============================================================================
 
 def create_agent_with_middleware():
     """
-    Створює агента з middleware hooks
+    Створює агента з middleware hooks використовуючи LangChain 1.0 API
 
     Middleware stack:
     1. LoggingMiddleware - logs all calls
@@ -293,9 +357,6 @@ def create_agent_with_middleware():
     print("  3️⃣  TokenLimitMiddleware - Control costs")
     print()
 
-    # LLM
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-
     # Tools
     tools = [get_stock_price, send_notification, execute_trade]
 
@@ -305,61 +366,18 @@ def create_agent_with_middleware():
         print(f"  • {t.name}: {risk}")
     print()
 
-    # Create agent with LangChain 1.0 API
-    agent = create_agent(llm=llm, tools=tools)
-
-    # Custom AgentExecutor that calls middleware
-    # Note: В реальній v1.0 API middleware інтегрується через callbacks або wrappers
-    class MiddlewareAgentExecutor(AgentExecutor):
-        def __init__(self, *args, middlewares=None, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.middlewares = middlewares or []
-
-        def _call(self, inputs: Dict[str, Any], *args, **kwargs):
-            """Override to add middleware hooks"""
-
-            # Before model middlewares
-            for mw in self.middlewares:
-                if hasattr(mw, 'before_model'):
-                    inputs = mw.before_model(inputs)
-
-            # Modify request middlewares
-            tools_to_use = self.tools
-            for mw in self.middlewares:
-                if hasattr(mw, 'modify_model_request'):
-                    modifications = mw.modify_model_request(
-                        tools=tools_to_use,
-                        messages=[],
-                    )
-                    tools_to_use = modifications.get('tools', tools_to_use)
-
-            # Temporarily update tools
-            original_tools = self.tools
-            self.tools = tools_to_use
-
-            # Execute agent
-            result = super()._call(inputs, *args, **kwargs)
-
-            # Restore tools
-            self.tools = original_tools
-
-            # After model middlewares
-            for mw in self.middlewares:
-                if hasattr(mw, 'after_model'):
-                    inputs = mw.after_model(inputs, result)
-
-            return result
-
-    executor = MiddlewareAgentExecutor(
-        agent=agent,
+    # Create agent with middleware (LangChain 1.0 API)
+    agent = MiddlewareAgent(
+        model="gpt-4o-mini",
         tools=tools,
-        verbose=True,
-        handle_parsing_errors=True,
-        max_iterations=3,
+        system_prompt="""You are a helpful AI assistant with access to financial tools.
+
+Use the available tools to answer user questions accurately.
+Always provide clear, helpful responses.""",
         middlewares=[logging_mw, security_mw, token_mw]
     )
 
-    return executor, {
+    return agent, {
         "logging": logging_mw,
         "security": security_mw,
         "tokens": token_mw
@@ -401,11 +419,24 @@ def test_middleware_agent():
         print("=" * 70)
 
         try:
-            result = agent.invoke({"input": test["input"]})
-            print(f"\n✅ Result: {result['output']}")
+            # LangChain 1.0 API: invoke приймає messages
+            result = agent.invoke({
+                "messages": [{"role": "user", "content": test["input"]}]
+            })
+
+            # Extract output від agent
+            if isinstance(result, dict) and "messages" in result:
+                last_message = result["messages"][-1]
+                output = last_message.content if hasattr(last_message, "content") else str(last_message)
+            else:
+                output = str(result)
+
+            print(f"\n✅ Result: {output}")
 
         except Exception as e:
             print(f"\n❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
 
         input("\n⏸️  Press Enter for next test...")
 
@@ -439,6 +470,7 @@ if __name__ == "__main__":
     print("  ✅ Security controls - Block risky operations")
     print("  ✅ Token limiting - Cost control")
     print("  ✅ LangSmith tracing - Full observability")
+    print("  ✅ LangChain 1.0 create_agent API")
     print("\n" + "=" * 70 + "\n")
 
     if not os.getenv("OPENAI_API_KEY"):

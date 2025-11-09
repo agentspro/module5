@@ -6,9 +6,8 @@ LangSmith Integration: Автоматично ввімкнений через en
 """
 
 import os
-from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
-from langchain.agents import create_agent, AgentExecutor
+from langchain.agents import create_agent
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -122,47 +121,37 @@ def create_basic_agent():
     """
     Створює базового агента з LangChain 1.0 API
 
-    Uses:
-    - create_agent: Створює агента з LangChain 1.0 (October 2025 API)
-    - AgentExecutor: Виконує агента з tools
+    В LangChain 1.0:
+    - create_agent приймає model (string), tools (list), system_prompt (string)
+    - Автоматично створює оптимальний промпт
+    - Повертає agent який можна викликати через .invoke()
+    - Не потрібен AgentExecutor
     """
     print("=" * 70)
     print("🤖 БАЗОВИЙ АГЕНТ - LangChain 1.0")
     print("=" * 70 + "\n")
 
-    # 1. Ініціалізація LLM
-    llm = ChatOpenAI(
-        model="gpt-4o-mini",  # or gpt-3.5-turbo for cheaper option
-        temperature=0,
-        model_kwargs={"response_format": {"type": "text"}}
-    )
-
-    # 2. Список tools
+    # 1. Список tools
     tools = [get_weather, calculate, search_docs]
 
     print("Available tools:")
-    for tool in tools:
-        print(f"  • {tool.name}: {tool.description[:60]}...")
+    for tool_item in tools:
+        print(f"  • {tool_item.name}: {tool_item.description[:60]}...")
     print()
 
-    # 3. Створення агента (LangChain 1.0 API)
-    # create_agent автоматично створює оптимальний промпт
+    # 2. Створення агента (LangChain 1.0 API)
+    # Передаємо model як string, а не ChatOpenAI об'єкт!
     agent = create_agent(
-        llm=llm,
-        tools=tools
-    )
-
-    # 4. Створення Agent Executor
-    agent_executor = AgentExecutor(
-        agent=agent,
+        model="gpt-4o-mini",  # або "gpt-3.5-turbo"
         tools=tools,
-        verbose=True,  # Show reasoning process
-        handle_parsing_errors=True,
-        max_iterations=5,
-        return_intermediate_steps=True
+        system_prompt="""You are a helpful AI assistant with access to tools.
+
+Use the available tools to answer user questions accurately.
+When you need information, use the appropriate tool.
+Always provide clear, helpful responses."""
     )
 
-    return agent_executor
+    return agent
 
 
 # ============================================================================
@@ -177,46 +166,59 @@ def test_basic_agent():
     # Тестові запити що вимагають різних tools
     test_queries = [
         {
-            "input": "What's the weather in Kyiv?",
+            "query": "What's the weather in Kyiv?",
             "expected_tool": "get_weather"
         },
         {
-            "input": "Calculate 123 * 456",
+            "query": "Calculate 123 * 456",
             "expected_tool": "calculate"
         },
         {
-            "input": "What is LangChain and how do I create agents?",
+            "query": "What is LangChain and how do I create agents?",
             "expected_tool": "search_docs"
         },
         {
-            "input": "What's the weather in Tokyo and what's 50 + 50?",
+            "query": "What's the weather in Tokyo and what's 50 + 50?",
             "expected_tool": "multiple"
         }
     ]
 
     for i, query_data in enumerate(test_queries, 1):
         print("\n" + "=" * 70)
-        print(f"TEST {i}: {query_data['input']}")
+        print(f"TEST {i}: {query_data['query']}")
         print(f"Expected tool(s): {query_data['expected_tool']}")
         print("=" * 70 + "\n")
 
         try:
-            result = agent.invoke({"input": query_data["input"]})
+            # LangChain 1.0 API: invoke приймає messages
+            result = agent.invoke({
+                "messages": [{"role": "user", "content": query_data["query"]}]
+            })
 
             print("\n" + "-" * 70)
             print("RESULT:")
             print("-" * 70)
-            print(f"Output: {result['output']}\n")
 
-            # Show which tools were used
-            if result.get('intermediate_steps'):
-                print("Tools used:")
-                for step in result['intermediate_steps']:
-                    action, observation = step
-                    print(f"  → {action.tool}: {action.tool_input}")
+            # Результат може бути в різних форматах залежно від версії
+            if isinstance(result, dict):
+                if "messages" in result:
+                    # Витягуємо останнє повідомлення
+                    last_message = result["messages"][-1]
+                    if hasattr(last_message, "content"):
+                        print(f"Output: {last_message.content}\n")
+                    else:
+                        print(f"Output: {last_message}\n")
+                elif "output" in result:
+                    print(f"Output: {result['output']}\n")
+                else:
+                    print(f"Output: {result}\n")
+            else:
+                print(f"Output: {result}\n")
 
         except Exception as e:
             print(f"\n❌ Error: {e}\n")
+            import traceback
+            traceback.print_exc()
 
         input("\n⏸️  Press Enter to continue to next test...\n")
 
@@ -232,10 +234,11 @@ if __name__ == "__main__":
     print()
     print("Features:")
     print("  ✅ create_agent - LangChain 1.0 API (October 2025)")
+    print("  ✅ Model as string parameter (not ChatOpenAI object)")
     print("  ✅ Multiple tools (weather, calculator, docs)")
     print("  ✅ Automatic optimal prompting")
     print("  ✅ LangSmith automatic tracing")
-    print("  ✅ Error handling and max iterations")
+    print("  ✅ Direct agent invocation (no AgentExecutor)")
     print()
     print("=" * 70 + "\n")
 
