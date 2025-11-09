@@ -271,9 +271,15 @@ AgentExecutor
 
 ### LangChain 1.0 Pattern (Agent 1)
 ```python
-agent = create_agent(llm=llm, tools=tools)
-executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-result = executor.invoke({"input": query})
+agent = create_agent(
+    model="gpt-4o-mini",  # model as string, not ChatOpenAI object
+    tools=tools,
+    system_prompt="You are a helpful assistant"
+)
+# Direct invocation - no AgentExecutor needed
+result = agent.invoke({
+    "messages": [{"role": "user", "content": "Your question here"}]
+})
 ```
 
 ### Middleware Pattern (Agent 2)
@@ -282,11 +288,17 @@ class LoggingMiddleware:
     def before_model(self, state): ...
     def after_model(self, state, result): ...
 
-executor = MiddlewareAgentExecutor(
-    agent=agent,
+# Wrapper around create_agent with middleware
+agent = MiddlewareAgent(
+    model="gpt-4o-mini",
     tools=tools,
+    system_prompt="You are a helpful assistant",
     middlewares=[LoggingMiddleware(), SecurityMiddleware()]
 )
+
+result = agent.invoke({
+    "messages": [{"role": "user", "content": "question"}]
+})
 ```
 
 ### Agentic RAG Pattern (Agent 3)
@@ -353,9 +365,18 @@ agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION
 
 **New (v1.0):**
 ```python
-from langchain.agents import create_agent, AgentExecutor
-agent = create_agent(llm, tools)
-executor = AgentExecutor(agent=agent, tools=tools)
+from langchain.agents import create_agent
+
+agent = create_agent(
+    model="gpt-4o-mini",  # model name as string
+    tools=tools,
+    system_prompt="You are a helpful assistant"
+)
+
+# Direct invocation - no AgentExecutor needed
+result = agent.invoke({
+    "messages": [{"role": "user", "content": "question"}]
+})
 ```
 
 ## Resources
