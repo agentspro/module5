@@ -35,11 +35,11 @@ load_dotenv()
 # ============================================================================
 
 if os.getenv("LANGCHAIN_TRACING_V2") == "true":
-    print("✅ LangSmith трейсинг активний для RAG Agent")
-    print(f"📊 Project: {os.getenv('LANGCHAIN_PROJECT', 'default')}")
+    print("OK LangSmith трейсинг активний для RAG Agent")
+    print(f"Stats: Project: {os.getenv('LANGCHAIN_PROJECT', 'default')}")
     print("🔍 All RAG operations will be traced: retrieve → grade → generate\n")
 else:
-    print("⚠️  LangSmith не ввімкнений\n")
+    print("WARNING  LangSmith не ввімкнений\n")
 
 
 # ============================================================================
@@ -119,7 +119,7 @@ def create_knowledge_base():
         )
     ]
 
-    print("📚 Creating knowledge base with documents:")
+    print("KB: Creating knowledge base with documents:")
     for i, doc in enumerate(documents, 1):
         print(f"  {i}. {doc.metadata.get('topic', 'general')}: {doc.page_content[:50]}...")
 
@@ -132,7 +132,7 @@ def create_knowledge_base():
         search_kwargs={"k": 2}  # Return top 2 most relevant docs
     )
 
-    print(f"✅ Knowledge base created with {len(documents)} documents\n")
+    print(f"OK Knowledge base created with {len(documents)} documents\n")
 
     return retriever
 
@@ -166,7 +166,7 @@ def retrieve_documents(state: RAGState) -> RAGState:
     """
 
     print(f"\n{'='*60}")
-    print("📚 NODE: Retrieve Documents")
+    print("KB: NODE: Retrieve Documents")
     print(f"{'='*60}")
 
     question = state["question"]
@@ -298,7 +298,7 @@ def generate_answer(state: RAGState) -> RAGState:
     """
 
     print(f"\n{'='*60}")
-    print("💡 NODE: Generate Answer")
+    print("TIP: NODE: Generate Answer")
     print(f"{'='*60}")
 
     question = state["question"]
@@ -390,7 +390,7 @@ def create_rag_agent():
     """
 
     print("=" * 70)
-    print("🔄 BUILDING AGENTIC RAG GRAPH")
+    print("Retry: BUILDING AGENTIC RAG GRAPH")
     print("=" * 70 + "\n")
 
     # Create graph
@@ -432,7 +432,7 @@ def create_rag_agent():
     print("             if relevant: generate → END")
     print("             if irrelevant: rewrite → retrieve (loop)")
     print()
-    print("✅ RAG Agent compiled with MemorySaver checkpointer\n")
+    print("OK RAG Agent compiled with MemorySaver checkpointer\n")
 
     return app
 
@@ -488,23 +488,23 @@ def test_rag_agent():
             print(f"\n{'='*70}")
             print("FINAL RESULT:")
             print(f"{'='*70}")
-            print(f"\n📝 Question: {result['question']}")
-            print(f"\n💡 Answer:\n{result['answer']}")
+            print(f"\nLOG Question: {result['question']}")
+            print(f"\nTIP: Answer:\n{result['answer']}")
             print(f"\n🔍 Reasoning steps:")
             for j, step in enumerate(result['reasoning'], 1):
                 print(f"  {j}. {step}")
-            print(f"\n📊 Stats:")
+            print(f"\nStats: Stats:")
             print(f"  - Query rewrites: {result['rewrite_count']}")
             print(f"  - Documents used: {len(result['retrieved_docs'])}")
             print(f"  - Final grade: {result['relevance_grade']}")
 
         except Exception as e:
-            print(f"\n❌ Error: {e}")
+            print(f"\nERROR: Error: {e}")
             import traceback
             traceback.print_exc()
 
         if i < len(test_queries):
-            input("\n⏸️  Press Enter for next test...\n")
+            input("\nPAUSE  Press Enter for next test...\n")
 
 
 # ============================================================================
@@ -512,37 +512,37 @@ def test_rag_agent():
 # ============================================================================
 
 if __name__ == "__main__":
-    print("\n🎯 LangGraph 1.0 - Agentic RAG with Checkpointing")
+    print("\nTARGET LangGraph 1.0 - Agentic RAG with Checkpointing")
     print("=" * 70)
     print("\nFeatures:")
-    print("  ✅ Dynamic retrieval with relevance grading")
-    print("  ✅ Automatic query rewriting if docs irrelevant")
-    print("  ✅ LangGraph StateGraph for orchestration")
-    print("  ✅ MemorySaver checkpointing for persistence")
-    print("  ✅ Conditional routing based on relevance")
-    print("  ✅ LangSmith tracing for full observability")
+    print("  OK Dynamic retrieval with relevance grading")
+    print("  OK Automatic query rewriting if docs irrelevant")
+    print("  OK LangGraph StateGraph for orchestration")
+    print("  OK MemorySaver checkpointing for persistence")
+    print("  OK Conditional routing based on relevance")
+    print("  OK LangSmith tracing for full observability")
     print("\n" + "=" * 70 + "\n")
 
     if not os.getenv("OPENAI_API_KEY"):
-        print("❌ ERROR: OPENAI_API_KEY not found!")
+        print("ERROR: ERROR: OPENAI_API_KEY not found!")
         exit(1)
 
     try:
         test_rag_agent()
 
         print("\n" + "=" * 70)
-        print("✅ ALL RAG TESTS COMPLETED")
+        print("OK ALL RAG TESTS COMPLETED")
         print("=" * 70)
-        print("\n💡 Agentic RAG Pattern Benefits:")
+        print("\nTIP: Agentic RAG Pattern Benefits:")
         print("  • Dynamic retrieval strategy")
         print("  • Self-correction through query rewriting")
         print("  • Relevance grading prevents hallucination")
         print("  • Checkpointing enables pause/resume")
-        print("\n💡 Check LangSmith for full execution traces!\n")
+        print("\nTIP: Check LangSmith for full execution traces!\n")
 
     except KeyboardInterrupt:
         print("\n\n⏹️  Interrupted")
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\nERROR: Error: {e}")
         import traceback
         traceback.print_exc()
