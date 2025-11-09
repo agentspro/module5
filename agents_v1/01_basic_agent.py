@@ -8,8 +8,7 @@ LangSmith Integration: Автоматично ввімкнений через en
 import os
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
-from langchain.agents import create_react_agent, AgentExecutor
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.agents import create_agent, AgentExecutor
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -124,7 +123,7 @@ def create_basic_agent():
     Створює базового агента з LangChain 1.0 API
 
     Uses:
-    - create_react_agent: Створює ReAct-style агента
+    - create_agent: Створює агента з LangChain 1.0 (October 2025 API)
     - AgentExecutor: Виконує агента з tools
     """
     print("=" * 70)
@@ -146,39 +145,14 @@ def create_basic_agent():
         print(f"  • {tool.name}: {tool.description[:60]}...")
     print()
 
-    # 3. Створення промпта для ReAct агента
-    # ReAct format: Thought → Action → Observation → ... → Final Answer
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a helpful AI assistant with access to tools.
-
-Use the following format:
-
-Question: the input question you must answer
-Thought: think about what you should do
-Action: the action to take (should be one of [{tool_names}])
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question
-
-Tools available:
-{tools}
-
-Begin!
-
-Question: {input}
-{agent_scratchpad}"""),
-    ])
-
-    # 4. Створення ReAct агента
-    agent = create_react_agent(
+    # 3. Створення агента (LangChain 1.0 API)
+    # create_agent автоматично створює оптимальний промпт
+    agent = create_agent(
         llm=llm,
-        tools=tools,
-        prompt=prompt
+        tools=tools
     )
 
-    # 5. Створення Agent Executor
+    # 4. Створення Agent Executor
     agent_executor = AgentExecutor(
         agent=agent,
         tools=tools,
@@ -257,9 +231,9 @@ if __name__ == "__main__":
     print("=" * 70)
     print()
     print("Features:")
-    print("  ✅ create_react_agent - Modern v1.0 API")
+    print("  ✅ create_agent - LangChain 1.0 API (October 2025)")
     print("  ✅ Multiple tools (weather, calculator, docs)")
-    print("  ✅ ReAct prompting pattern")
+    print("  ✅ Automatic optimal prompting")
     print("  ✅ LangSmith automatic tracing")
     print("  ✅ Error handling and max iterations")
     print()

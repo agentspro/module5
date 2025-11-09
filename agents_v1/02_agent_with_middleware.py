@@ -14,8 +14,7 @@ import os
 from typing import Dict, Any, List
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
-from langchain.agents import create_react_agent, AgentExecutor
-from langchain_core.prompts import ChatPromptTemplate
+from langchain.agents import create_agent, AgentExecutor
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from dotenv import load_dotenv
 import json
@@ -306,26 +305,8 @@ def create_agent_with_middleware():
         print(f"  • {t.name}: {risk}")
     print()
 
-    # Create agent
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a helpful AI assistant with access to financial tools.
-
-Available tools:
-{tools}
-
-Use this format:
-Question: {input}
-Thought: Consider what to do
-Action: tool name
-Action Input: tool input
-Observation: tool result
-... (repeat as needed)
-Final Answer: your response
-
-{agent_scratchpad}"""),
-    ])
-
-    agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
+    # Create agent with LangChain 1.0 API
+    agent = create_agent(llm=llm, tools=tools)
 
     # Custom AgentExecutor that calls middleware
     # Note: В реальній v1.0 API middleware інтегрується через callbacks або wrappers
