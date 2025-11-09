@@ -4,11 +4,12 @@ Production-ready agent implementations showcasing key innovations in LangChain 1
 
 ## Overview
 
-This repository contains three comprehensive agent examples demonstrating the latest LangChain/LangGraph patterns:
+This repository contains four comprehensive agent examples demonstrating the latest LangChain/LangGraph patterns:
 
 1. **Basic Agent** - Agent using `create_agent` API (LangChain 1.0)
 2. **Middleware Agent** - Agent with before/after/modify hooks
 3. **RAG Agent** - Agentic RAG with LangGraph StateGraph and checkpointing
+4. **Multi-Agent System** - Supervisor Pattern with coordinated specialized agents
 
 All agents include **LangSmith tracing** for full observability.
 
@@ -25,6 +26,9 @@ All agents include **LangSmith tracing** for full observability.
 - ✅ Checkpointing with MemorySaver
 - ✅ Conditional routing and loops
 - ✅ Thread-based conversation persistence
+- ✅ Supervisor Pattern for multi-agent coordination
+- ✅ Hierarchical agent teams
+- ✅ Shared state management across agents
 
 ### LangSmith Integration
 - ✅ Automatic tracing for all agents
@@ -241,6 +245,161 @@ config2 = {"configurable": {"thread_id": "conversation_2"}}
 
 ---
 
+### 4. Multi-Agent System (04_multiagent_langgraph.py)
+
+**Purpose:** Implements Supervisor Pattern with hierarchical multi-agent coordination using LangGraph 1.0.
+
+**Pattern:** Supervisor coordinating specialized agents
+```
+User Query → Supervisor → [Researcher → Supervisor → Analyzer → Supervisor → Synthesizer] → END
+```
+
+**Architecture:**
+```
+START → Supervisor
+         ↓ (delegates to specialist)
+    [Researcher | Analyzer | Synthesizer]
+         ↓ (returns control)
+      Supervisor (decides next step)
+         ↓
+      END (when complete)
+```
+
+**Run:**
+```bash
+python 04_multiagent_langgraph.py
+```
+
+**Specialized Agents:**
+
+1. **SupervisorAgent** 🎯
+   - Coordinates team of specialists
+   - Makes delegation decisions
+   - Evaluates progress and determines completion
+   - Uses structured output for routing logic
+
+2. **ResearcherAgent** 🔍
+   - RAG-based knowledge retrieval
+   - Searches LangGraph 1.0 documentation
+   - Evaluates quality of retrieved documents
+   - Returns top-k relevant sources
+
+3. **AnalyzerAgent** 🔬
+   - Analyzes retrieved information
+   - Extracts key insights and patterns
+   - Structures technical details
+   - Identifies best practices
+
+4. **SynthesizerAgent** 🎨
+   - Creates comprehensive final answer
+   - Combines analysis with source docs
+   - Formats response for readability
+   - Cites sources appropriately
+
+**Key Features:**
+- Supervisor Pattern from LangGraph 1.0 (2025)
+- Hierarchical multi-agent coordination
+- Shared StateGraph across all agents
+- Conditional routing based on supervisor decisions
+- MemorySaver checkpointing for workflow persistence
+- RAG integration with 8-document knowledge base
+- LangSmith tracing for all agent interactions
+- Structured decision-making with Pydantic models
+
+**Knowledge Base (LangGraph 1.0 Topics):**
+- Supervisor Pattern architecture
+- StateGraph API and features
+- Checkpointing mechanisms (MemorySaver, PostgresSaver)
+- Multi-agent coordination patterns
+- LangGraph Swarm (2025 release)
+- LangGraph Server & persistence
+- Error handling & recovery strategies
+- Best practices for multi-agent systems
+
+**Example Flow:**
+
+```
+Query: "What is the Supervisor Pattern in LangGraph 1.0?"
+
+🎯 SUPERVISOR: Decides to delegate to researcher
+  → Decision: researcher
+  → Reasoning: Need to find information first
+
+🔍 RESEARCHER: Searches knowledge base
+  → Found 3 documents about Supervisor Pattern
+  → Quality: Sufficient (confidence: 0.95)
+
+🎯 SUPERVISOR: Delegates to analyzer
+  → Decision: analyzer
+  → Reasoning: Documents found, need analysis
+
+🔬 ANALYZER: Analyzes documents
+  → Extracted: Pattern definition, architecture, use cases
+  → Key concepts: hierarchical coordination, specialized agents
+
+🎯 SUPERVISOR: Delegates to synthesizer
+  → Decision: synthesizer
+  → Reasoning: Analysis ready, create final answer
+
+🎨 SYNTHESIZER: Creates comprehensive answer
+  → Combined analysis with source citations
+  → Formatted with examples and technical details
+  → Answer: [Detailed explanation of Supervisor Pattern]
+
+🎯 SUPERVISOR: Work complete
+  → Decision: FINISH
+
+Stats:
+  - Iterations: 4
+  - Agents invoked: 3 specialists
+  - Documents retrieved: 3
+  - Messages exchanged: 7
+```
+
+**State Schema:**
+```python
+class MultiAgentState(TypedDict):
+    messages: Annotated[List, operator.add]  # Agent communication
+    question: str  # User query
+    current_agent: str  # Active agent
+    retrieved_docs: List[Document]  # From researcher
+    analysis: str  # From analyzer
+    final_answer: str  # From synthesizer
+    supervisor_decision: str  # Reasoning
+    iteration_count: int  # Progress tracking
+```
+
+**Workflow Diagram:**
+```
+┌──────────────┐
+│  Supervisor  │◄─────────┐
+└──────┬───────┘          │
+       │                  │
+   ┌───▼────┬─────┬──────┤
+   │        │     │      │
+┌──▼──┐  ┌─▼──┐ ┌▼───┐  │
+│Res. │  │Ana.│ │Syn.│  │
+└──┬──┘  └─┬──┘ └┬───┘  │
+   │       │     │      │
+   └───────┴─────┴──────┘
+```
+
+**Checkpointing:**
+```python
+# Each workflow run uses unique thread
+config = {"configurable": {"thread_id": "workflow_1"}}
+
+# Execute multi-agent workflow
+for event in app.stream(initial_state, config):
+    print(f"Agent: {list(event.keys())[0]}")
+
+# Retrieve final state
+final_state = app.get_state(config)
+answer = final_state.values['final_answer']
+```
+
+---
+
 ## LangSmith Tracing
 
 All agents automatically send traces to LangSmith when `LANGCHAIN_TRACING_V2=true`.
@@ -310,6 +469,59 @@ workflow.add_conditional_edges("grade", decide_next_step, {...})
 
 checkpointer = MemorySaver()
 app = workflow.compile(checkpointer=checkpointer)
+```
+
+### Multi-Agent Supervisor Pattern (Agent 4)
+```python
+# Define shared state for all agents
+class MultiAgentState(TypedDict):
+    messages: Annotated[List, operator.add]
+    question: str
+    current_agent: str
+    retrieved_docs: List[Document]
+    analysis: str
+    final_answer: str
+    supervisor_decision: str
+    iteration_count: int
+
+# Create StateGraph with all agents
+workflow = StateGraph(MultiAgentState)
+
+# Add specialized agent nodes
+workflow.add_node("supervisor", supervisor_node)
+workflow.add_node("researcher", researcher_node)  # RAG search
+workflow.add_node("analyzer", analyzer_node)      # Analysis
+workflow.add_node("synthesizer", synthesizer_node) # Final answer
+
+# Entry point: supervisor
+workflow.set_entry_point("supervisor")
+
+# Conditional routing from supervisor
+workflow.add_conditional_edges(
+    "supervisor",
+    route_after_supervisor,  # Decision function
+    {
+        "researcher": "researcher",
+        "analyzer": "analyzer",
+        "synthesizer": "synthesizer",
+        "end": END
+    }
+)
+
+# Return control to supervisor after each agent
+workflow.add_edge("researcher", "supervisor")
+workflow.add_edge("analyzer", "supervisor")
+workflow.add_edge("synthesizer", "supervisor")
+
+# Compile with checkpointer
+checkpointer = MemorySaver()
+app = workflow.compile(checkpointer=checkpointer)
+
+# Execute with thread-based isolation
+config = {"configurable": {"thread_id": "workflow_1"}}
+for event in app.stream(initial_state, config):
+    agent_name = list(event.keys())[0]
+    print(f"Current agent: {agent_name}")
 ```
 
 ## Production Considerations
