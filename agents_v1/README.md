@@ -1,0 +1,373 @@
+# LangChain 1.0 & LangGraph 1.0 Agents
+
+Production-ready agent implementations showcasing key innovations in LangChain 1.0 and LangGraph 1.0 (2025 release).
+
+## Overview
+
+This repository contains three comprehensive agent examples demonstrating the latest LangChain/LangGraph patterns:
+
+1. **Basic Agent** - ReAct agent using `create_react_agent` API
+2. **Middleware Agent** - Agent with before/after/modify hooks
+3. **RAG Agent** - Agentic RAG with LangGraph StateGraph and checkpointing
+
+All agents include **LangSmith tracing** for full observability.
+
+## Features
+
+### LangChain 1.0 (October 2025)
+- ✅ `create_react_agent()` - Modern agent creation API
+- ✅ Middleware architecture with three hooks
+- ✅ Stable APIs (no breaking changes until 2.0)
+- ✅ Production-ready patterns
+
+### LangGraph 1.0
+- ✅ StateGraph for complex orchestration
+- ✅ Checkpointing with MemorySaver
+- ✅ Conditional routing and loops
+- ✅ Thread-based conversation persistence
+
+### LangSmith Integration
+- ✅ Automatic tracing for all agents
+- ✅ Cost tracking and latency analysis
+- ✅ Trace visualization for debugging
+
+## Setup
+
+### 1. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Configure Environment
+
+Copy `.env.example` to `.env` and fill in your API keys:
+
+```bash
+cp .env.example .env
+```
+
+Required variables:
+```bash
+OPENAI_API_KEY=sk-your-key          # Get from https://platform.openai.com/api-keys
+LANGCHAIN_TRACING_V2=true            # Enable LangSmith tracing
+LANGCHAIN_API_KEY=ls__your-key       # Get from https://smith.langchain.com
+LANGCHAIN_PROJECT=langchain-v1-agents
+```
+
+## Agents
+
+### 1. Basic Agent (01_basic_agent.py)
+
+**Purpose:** Demonstrates the modern `create_react_agent` API with multiple tools.
+
+**Pattern:** ReAct (Reasoning and Acting)
+```
+User Query → Think → Act (use tool) → Observe → Think → Answer
+```
+
+**Tools:**
+- `get_weather` - Weather information for any location
+- `calculate` - Mathematical expression evaluation
+- `search_docs` - Technical documentation search
+
+**Run:**
+```bash
+python 01_basic_agent.py
+```
+
+**Key Features:**
+- Uses `create_react_agent` (v1.0 API, not deprecated AgentExecutor)
+- Error handling with `handle_parsing_errors=True`
+- Max iterations limit for safety
+- Returns intermediate steps for debugging
+- Full LangSmith trace integration
+
+**Example Output:**
+```
+Query: "What's the weather in Kyiv and calculate 15% tip on 250 UAH?"
+
+Thought: I need to get weather first, then calculate the tip
+Action: get_weather
+Action Input: Kyiv
+Observation: Partly cloudy, 18°C
+
+Thought: Now I'll calculate the tip
+Action: calculate
+Action Input: 250 * 0.15
+Observation: 37.5
+
+Final Answer: Weather in Kyiv is partly cloudy at 18°C.
+A 15% tip on 250 UAH is 37.50 UAH.
+```
+
+---
+
+### 2. Middleware Agent (02_agent_with_middleware.py)
+
+**Purpose:** Demonstrates the new middleware architecture introduced in LangChain 1.0 (2025).
+
+**Pattern:** Agent with Middleware Hooks
+```
+Request → before_model → [modify_model_request] → LLM Call → after_model → Response
+```
+
+**Middleware Implementations:**
+
+1. **LoggingMiddleware** - Observability
+   - `before_model`: Log input state, token count
+   - `after_model`: Log output, execution time
+
+2. **SecurityMiddleware** - Safety controls
+   - `modify_model_request`: Block high-risk tools (execute_trade, send_notification)
+   - Prevent unauthorized actions
+
+3. **TokenLimitMiddleware** - Cost control
+   - `before_model`: Check token usage
+   - Throttle requests if limit exceeded
+
+**Run:**
+```bash
+python 02_agent_with_middleware.py
+```
+
+**Key Features:**
+- Custom `MiddlewareAgentExecutor` class
+- Three middleware hooks: before_model, after_model, modify_model_request
+- High-risk tool blocking for security
+- Token usage tracking for cost control
+- Full execution logging
+
+**Example Output:**
+```
+Query: "Execute a trade for 1000 BTC"
+
+[LoggingMiddleware] Before model call...
+[SecurityMiddleware] Checking tools for security risks...
+[SecurityMiddleware] ⚠️  Blocking high-risk tool: execute_trade
+[TokenLimitMiddleware] Token usage: 150/1000
+
+Agent Response: "I cannot execute trades as the execute_trade tool
+has been disabled for security reasons."
+
+[LoggingMiddleware] After model call (1.2s, 45 tokens)
+```
+
+---
+
+### 3. RAG Agent (03_rag_agent_langgraph.py)
+
+**Purpose:** Implements Agentic RAG pattern using LangGraph with dynamic retrieval strategies.
+
+**Pattern:** Agentic RAG with Query Rewriting
+```
+User Query → Retrieve Docs → Grade Relevance
+    ↓ (if relevant)
+Generate Answer → END
+    ↓ (if irrelevant)
+Rewrite Query → Retrieve Again → Grade → ...
+```
+
+**Graph Structure:**
+```
+START → retrieve → grade → [decide]
+                    ↓
+           if relevant: generate → END
+           if irrelevant: rewrite → retrieve (loop)
+```
+
+**Run:**
+```bash
+python 03_rag_agent_langgraph.py
+```
+
+**Key Features:**
+- LangGraph StateGraph for orchestration
+- FAISS vector store with 6 documents about LangChain/LangGraph
+- Dynamic relevance grading using LLM
+- Automatic query rewriting if docs irrelevant
+- MemorySaver checkpointing (thread_id for separate sessions)
+- Conditional routing based on relevance
+- Max rewrite limit to prevent infinite loops
+
+**Knowledge Base Topics:**
+- LangChain 1.0 Release features
+- LangGraph checkpointing (MemorySaver, PostgresSaver)
+- Agent middleware architecture
+- Agentic RAG patterns
+- LangSmith integration
+- Production best practices
+
+**Example Flow:**
+
+```
+Test 1: "What are the new middleware hooks in LangChain 1.0?"
+
+NODE: Retrieve Documents
+  Retrieved 2 documents: middleware, langchain
+
+NODE: Grade Document Relevance
+  Grade: RELEVANT
+  Reasoning: Documents contain info about middleware hooks
+
+ROUTING: Going to generate_answer
+
+NODE: Generate Answer
+  Answer: LangChain 1.0 introduces three middleware hooks:
+  - before_model: Pre-processing before LLM calls
+  - after_model: Post-processing after responses
+  - modify_model_request: Modify tools, prompts, messages
+  Built-in middlewares include Human-in-the-loop,
+  Summarization, and PII redaction.
+
+Stats:
+  - Query rewrites: 0
+  - Documents used: 2
+  - Final grade: relevant
+```
+
+**Checkpointing Example:**
+```python
+# Each query uses unique thread_id
+config = {"configurable": {"thread_id": "conversation_1"}}
+
+# Resume from checkpoint
+result = agent.invoke(state, config)
+
+# Different conversation
+config2 = {"configurable": {"thread_id": "conversation_2"}}
+```
+
+---
+
+## LangSmith Tracing
+
+All agents automatically send traces to LangSmith when `LANGCHAIN_TRACING_V2=true`.
+
+**View traces at:** https://smith.langchain.com
+
+**What's traced:**
+- Agent reasoning steps (Thought → Action → Observation)
+- Tool calls and results
+- LLM prompts and completions
+- Token usage and costs
+- Latency for each operation
+- RAG retrieval and grading steps
+
+**Example trace hierarchy:**
+```
+AgentExecutor
+├─ LLM Call (Reasoning)
+├─ Tool: get_weather
+│  └─ Result: "Partly cloudy, 18°C"
+├─ LLM Call (Next action)
+├─ Tool: calculate
+│  └─ Result: "37.5"
+└─ LLM Call (Final answer)
+```
+
+## Architecture Patterns
+
+### ReAct Pattern (Agent 1)
+```python
+agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
+executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+result = executor.invoke({"input": query})
+```
+
+### Middleware Pattern (Agent 2)
+```python
+class LoggingMiddleware:
+    def before_model(self, state): ...
+    def after_model(self, state, result): ...
+
+executor = MiddlewareAgentExecutor(
+    agent=agent,
+    tools=tools,
+    middlewares=[LoggingMiddleware(), SecurityMiddleware()]
+)
+```
+
+### Agentic RAG Pattern (Agent 3)
+```python
+workflow = StateGraph(RAGState)
+workflow.add_node("retrieve", retrieve_documents)
+workflow.add_node("grade", grade_documents)
+workflow.add_conditional_edges("grade", decide_next_step, {...})
+
+checkpointer = MemorySaver()
+app = workflow.compile(checkpointer=checkpointer)
+```
+
+## Production Considerations
+
+### Error Handling
+- All agents use `handle_parsing_errors=True`
+- Max iterations limit prevents infinite loops
+- Try-except blocks for graceful degradation
+
+### Security
+- Middleware can block dangerous tools
+- Input validation via Pydantic models
+- No execution of arbitrary code
+
+### Cost Control
+- Token limit middleware for budget management
+- Efficient retrieval with `k=2` top documents
+- Model selection: `gpt-4o-mini` for cost efficiency
+
+### Observability
+- LangSmith tracing for all operations
+- Logging middleware for debugging
+- Structured outputs for reliability
+
+### Scalability
+- Stateless agent design (except RAG checkpointing)
+- Async support available (use `ainvoke`)
+- Thread-based isolation for concurrent sessions
+
+## Troubleshooting
+
+**Issue:** `ImportError: cannot import name 'create_react_agent'`
+- **Fix:** Ensure `langchain>=1.0.0` is installed
+
+**Issue:** LangSmith traces not appearing
+- **Fix:** Check `.env` has `LANGCHAIN_TRACING_V2=true` and valid `LANGCHAIN_API_KEY`
+
+**Issue:** RAG agent not finding relevant documents
+- **Fix:** Check FAISS vector store creation, try different queries, inspect retrieved docs
+
+**Issue:** Middleware not being called
+- **Fix:** Ensure using `MiddlewareAgentExecutor`, not standard `AgentExecutor`
+
+## Migration from v0.x
+
+If migrating from LangChain 0.x:
+
+**Old (Deprecated):**
+```python
+from langchain.agents import initialize_agent, AgentType
+agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION)
+```
+
+**New (v1.0):**
+```python
+from langchain.agents import create_react_agent, AgentExecutor
+agent = create_react_agent(llm, tools, prompt)
+executor = AgentExecutor(agent=agent, tools=tools)
+```
+
+## Resources
+
+- **LangChain Docs:** https://docs.langchain.com/oss/python/langchain/agents
+- **LangGraph Docs:** https://langchain-ai.github.io/langgraph/
+- **LangSmith:** https://smith.langchain.com
+- **LangChain 1.0 Release Notes:** https://blog.langchain.dev/langchain-v1-0/
+
+## License
+
+MIT
+
+## Contributing
+
+This is a demonstration repository for educational purposes. All agents use production-ready patterns from LangChain 1.0 and LangGraph 1.0 (2025 release).
