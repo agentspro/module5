@@ -1,343 +1,328 @@
-# LangChain v1.0 та LangGraph 1.0 - Демонстраційні Скрипти
+# 🚀 LangChain v1.0 та LangGraph - Гід з Міграції
 
-Цей репозиторій містить комплексні приклади використання ключових нововведень **LangChain v1.0** та **LangGraph 1.0**.
+> **Показуємо ЩО змінилось, ЧОМУ це важливо, і ЯК це використовувати**
 
-## 📋 Зміст
+Цей репозиторій містить порівняльні приклади, які демонструють **еволюцію** від LangChain v0.x до v1.0 та показують **практичну цінність** LangGraph.
 
-- [Встановлення](#встановлення)
-- [Налаштування](#налаштування)
-- [LangChain v1.0 Скрипти](#langchain-v10-скрипти)
-- [LangGraph 1.0 Скрипти](#langgraph-10-скрипти)
-- [Ключові Нововведення](#ключові-нововведення)
-- [Використання](#використання)
+---
 
-## 🚀 Встановлення
+## 🎯 Головна ідея
+
+**Не просто "як використовувати"**, а:
+- ✅ **Проблема** в старому підході (v0.x)
+- ✅ **Рішення** в новому підході (v1.0)
+- ✅ **Чому** це важливо
+- ✅ **Як** це застосувати на практиці
+
+---
+
+## 📚 Структура
+
+### 🔄 Порівняльні приклади
+
+| Файл | Що показує | Запуск |
+|------|-----------|--------|
+| **`01_migration_chains_comparison.py`** | **Ланцюги: v0.x → v1.0 (LCEL)**<br>• Композиція через `\|`<br>• Runnable інтерфейс<br>• Streaming та Batch<br>• Паралельність | `python 01_migration_chains_comparison.py` |
+| **`02_migration_agents_comparison.py`** | **Агенти: Без → З LangGraph**<br>• State Graphs<br>• Checkpointing<br>• Цикли<br>• Human-in-the-loop | `python 02_migration_agents_comparison.py` |
+| **`03_real_world_example.py`** | **Еволюція Customer Support Bot**<br>v1.0: Простий чат<br>v2.0: + RAG<br>v3.0: + LangGraph + Tools | `python 03_real_world_example.py` |
+
+### 📖 Документація
+
+| Файл | Опис |
+|------|------|
+| **`MIGRATION_GUIDE.md`** | Повний гід з міграції з v0.x → v1.0 |
+| **`README.md`** | Цей файл |
+
+---
+
+## 🚀 Швидкий старт
+
+### 1. Встановлення
 
 ```bash
-# Клонування репозиторію
-git clone <repository-url>
-cd module5
-
-# Створення віртуального середовища
+# Створіть віртуальне середовище
 python -m venv venv
-source venv/bin/activate  # На Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Встановлення залежностей
+# Встановіть залежності
 pip install -r requirements.txt
 ```
 
-## ⚙️ Налаштування
+### 2. Налаштування
 
-1. Скопіюйте файл `.env.example` в `.env`:
 ```bash
+# Скопіюйте приклад
 cp .env.example .env
+
+# Додайте ваші API ключі
+# OPENAI_API_KEY=sk-...
 ```
 
-2. Додайте ваші API ключі в `.env`:
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-LANGCHAIN_API_KEY=your_langsmith_api_key_here
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_PROJECT=langchain-langgraph-v1-demo
+### 3. Запуск прикладів
+
+```bash
+# Почніть з порівняння ланцюгів
+python 01_migration_chains_comparison.py
+
+# Потім агенти
+python 02_migration_agents_comparison.py
+
+# Реальний приклад
+python 03_real_world_example.py
 ```
 
-## 📚 LangChain v1.0 Скрипти
+---
 
-### 1. `langchain_v1_lcel.py` - LCEL (LangChain Expression Language)
+## 💡 Що ви дізнаєтесь
 
-**Ключові можливості:**
-- ✅ Композиція ланцюгів з оператором `|`
-- ✅ Паралельне виконання ланцюгів
-- ✅ RunnablePassthrough для передачі контексту
-- ✅ Стрімінг відповідей
-- ✅ Пакетна обробка
+### 📦 01: Міграція ланцюгів
 
-**Приклад використання:**
+**Проблема v0.x:**
 ```python
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
-from langchain_core.output_parsers import StrOutputParser
+# Багато boilerplate
+from langchain.chains import LLMChain
+prompt = PromptTemplate(...)
+chain = LLMChain(llm=llm, prompt=prompt)
+result = chain.run(input)  # Deprecated!
+```
 
-# Композиція з оператором |
-prompt = ChatPromptTemplate.from_template("Розкажи про {topic}")
-model = ChatOpenAI(model="gpt-3.5-turbo")
-output_parser = StrOutputParser()
-
+**Рішення v1.0:**
+```python
+# Просто і зрозуміло
 chain = prompt | model | output_parser
-result = chain.invoke({"topic": "LangChain"})
+result = chain.invoke(input)
 ```
 
-**Запуск:**
-```bash
-python langchain_v1_lcel.py
-```
+**Що покращилось:**
+- ✅ Оператор `|` для композиції (як Unix pipes)
+- ✅ Єдиний `.invoke()` замість `.run()`, `.predict()`, `__call__()`
+- ✅ Автоматична підтримка `.stream()` та `.batch()`
+- ✅ RunnableParallel для паралельного виконання
 
 ---
 
-### 2. `langchain_v1_structured_output.py` - Structured Output
+### 🤖 02: Міграція агентів
 
-**Ключові можливості:**
-- ✅ Pydantic моделі для структурованих даних
-- ✅ PydanticOutputParser
-- ✅ with_structured_output() метод (function calling)
-- ✅ Валідація та типізація
-- ✅ Пакетна обробка структурованих даних
-
-**Приклад використання:**
+**Проблема без LangGraph:**
 ```python
-from pydantic import BaseModel, Field
-from langchain_openai import ChatOpenAI
-
-class Person(BaseModel):
-    name: str = Field(description="Ім'я персони")
-    age: int = Field(description="Вік персони")
-    occupation: str = Field(description="Професія")
-
-model = ChatOpenAI(model="gpt-3.5-turbo")
-structured_llm = model.with_structured_output(Person)
-
-result = structured_llm.invoke("Марія, 28 років, UX дизайнер")
-print(f"{result.name}, {result.age} років, {result.occupation}")
+# AgentExecutor - чорна скринька
+agent_executor = AgentExecutor(agent=agent, tools=tools)
+# Важко кастомізувати, складно дебажити
 ```
 
-**Запуск:**
-```bash
-python langchain_v1_structured_output.py
-```
-
----
-
-### 3. `langchain_v1_rag.py` - RAG (Retrieval-Augmented Generation)
-
-**Ключові можливості:**
-- ✅ LCEL для RAG pipeline
-- ✅ Векторні сховища (FAISS)
-- ✅ RAG з джерелами
-- ✅ Фільтрація по метаданим
-- ✅ Multi-Query RAG
-- ✅ Стрімінг RAG відповідей
-
-**Приклад використання:**
+**Рішення з LangGraph:**
 ```python
-from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
-
-# Створення RAG ланцюга
-vectorstore = FAISS.from_documents(documents, OpenAIEmbeddings())
-retriever = vectorstore.as_retriever()
-
-rag_chain = (
-    {"context": retriever | format_docs, "question": RunnablePassthrough()}
-    | prompt
-    | model
-    | StrOutputParser()
-)
-
-answer = rag_chain.invoke("Що таке LCEL?")
-```
-
-**Запуск:**
-```bash
-python langchain_v1_rag.py
-```
-
----
-
-## 🔄 LangGraph 1.0 Скрипти
-
-### 4. `langgraph_v1_basics.py` - Основи LangGraph
-
-**Ключові можливості:**
-- ✅ Створення State Graphs
-- ✅ Умовні переходи (conditional edges)
-- ✅ Цикли в графах
-- ✅ Message Graphs для чат-ботів
-- ✅ Багатокрокове міркування
-
-**Приклад використання:**
-```python
-from langgraph.graph import StateGraph, END
-from typing import TypedDict
-
-class State(TypedDict):
-    counter: int
-
-def increment(state: State) -> State:
-    return {"counter": state["counter"] + 1}
-
-workflow = StateGraph(State)
-workflow.add_node("increment", increment)
-workflow.set_entry_point("increment")
-workflow.add_edge("increment", END)
-
-app = workflow.compile()
-result = app.invoke({"counter": 0})
-```
-
-**Запуск:**
-```bash
-python langgraph_v1_basics.py
-```
-
----
-
-### 5. `langgraph_v1_agents.py` - Агенти з інструментами
-
-**Ключові можливості:**
-- ✅ Агенти з інструментами (tools)
-- ✅ ToolNode для виконання інструментів
-- ✅ Агенти з пам'яттю
-- ✅ ReAct паттерн (міркування та дії)
-- ✅ Supervisor агенти
-
-**Приклад використання:**
-```python
-from langchain_core.tools import tool
-from langgraph.prebuilt import ToolNode
-
-@tool
-def calculator(expression: str) -> str:
-    """Виконує математичні обчислення."""
-    return str(eval(expression))
-
-tools = [calculator]
-model = ChatOpenAI(model="gpt-3.5-turbo").bind_tools(tools)
-
+# Явний граф - повний контроль
+workflow = StateGraph(AgentState)
 workflow.add_node("agent", call_model)
 workflow.add_node("tools", ToolNode(tools))
-# ... додавання ребер
+workflow.add_conditional_edges(...)
+
+app = workflow.compile(checkpointer=checkpointer)
 ```
 
-**Запуск:**
-```bash
-python langgraph_v1_agents.py
-```
+**Що покращилось:**
+- ✅ Декларативний підхід замість імперативного
+- ✅ Візуалізація графа виконання
+- ✅ Автоматичний checkpointing
+- ✅ Цикли та умовні переходи
+- ✅ Human-in-the-loop з коробки
 
 ---
 
-### 6. `langgraph_v1_persistence.py` - Persistence та Checkpointing
+### 🎯 03: Реальний приклад
 
-**Ключові можливості:**
-- ✅ MemorySaver для збереження стану
-- ✅ Checkpointing між викликами
-- ✅ Thread-based conversations
-- ✅ Відновлення стану
-- ✅ Історія checkpoints
+**Customer Support Bot - Еволюція:**
 
-**Приклад використання:**
+#### Версія 1.0: Простий чат
 ```python
-from langgraph.checkpoint.memory import MemorySaver
+chain = prompt | model | output_parser
+```
+❌ Немає пам'яті, немає знань
+
+#### Версія 2.0: + RAG (База знань)
+```python
+rag_chain = (
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    | prompt | model | StrOutputParser()
+)
+```
+✅ Шукає в документації
+❌ Все ще немає пам'яті
+
+#### Версія 3.0: + LangGraph + Tools
+```python
+workflow = StateGraph(AgentState)
+workflow.add_node("agent", call_model)
+workflow.add_node("tools", ToolNode([search, reset_password, create_ticket]))
 
 checkpointer = MemorySaver()
 app = workflow.compile(checkpointer=checkpointer)
-
-# Конфігурація з thread_id
-config = {"configurable": {"thread_id": "conversation_1"}}
-
-# Перша взаємодія
-result1 = app.invoke(input1, config)
-
-# Друга взаємодія - зберігається контекст
-result2 = app.invoke(input2, config)
 ```
+✅ **Готово до production!**
+- Пам'ятає контекст
+- Шукає в базі знань
+- Виконує дії
+- Зберігає стан
 
-**Запуск:**
+---
+
+## 📊 Порівняльна таблиця
+
+### LangChain v0.x → v1.0
+
+| Що робимо | v0.x (Старе) | v1.0 (Нове) | Переваги |
+|-----------|--------------|-------------|----------|
+| **Композиція** | `LLMChain`, класи | Оператор `\|` | Інтуїтивно |
+| **Виклик** | `.run()`, `.predict()` | `.invoke()` | Єдиний API |
+| **Streaming** | Різні API | `.stream()` | Для всіх компонентів |
+| **Batch** | `.apply()` або цикл | `.batch()` | Автоматична оптимізація |
+| **Паралельність** | `asyncio.gather()` | `RunnableParallel` | Декларативно |
+| **RAG** | `RetrievalQA` | Custom LCEL chain | Більше контролю |
+
+### Без LangGraph → З LangGraph
+
+| Можливість | Без LangGraph | З LangGraph | Переваги |
+|------------|---------------|-------------|----------|
+| **Побудова агента** | `AgentExecutor` | `StateGraph` | Повний контроль |
+| **Візуалізація** | ❌ Чорна скринька | ✅ Експорт графа | Прозорість |
+| **Пам'ять** | `ConversationBufferMemory` | `Checkpointer` | Автоматично |
+| **Цикли** | ❌ Обмежені | ✅ Повна підтримка | Складна логіка |
+| **Human-in-loop** | ❌ Вручну | ✅ Вбудовано | Approval workflows |
+| **Дебаг** | ⭐⭐ Складно | ⭐⭐⭐⭐⭐ Легко | Бачимо кожен крок |
+
+---
+
+## 🎓 Навчальний шлях
+
+### Крок 1: Зрозумійте проблеми v0.x
 ```bash
-python langgraph_v1_persistence.py
+python 01_migration_chains_comparison.py
+```
+Побачите:
+- Чому старий підхід незручний
+- Скільки boilerplate коду
+- Які обмеження
+
+### Крок 2: Дізнайтесь про LangGraph
+```bash
+python 02_migration_agents_comparison.py
+```
+Побачите:
+- Різницю між AgentExecutor та StateGraph
+- Переваги checkpointing
+- Можливості циклів
+
+### Крок 3: Застосуйте на практиці
+```bash
+python 03_real_world_example.py
+```
+Побачите:
+- Еволюцію реального застосунку
+- Як комбінувати RAG + LangGraph + Tools
+- Production-ready приклад
+
+### Крок 4: Мігруйте свій код
+Використовуйте `MIGRATION_GUIDE.md` як чек-лист
+
+---
+
+## 💡 Ключові висновки
+
+### Чому LCEL (v1.0) важливий?
+
+1. **Інтуїтивність** - оператор `|` як Unix pipes
+2. **Єдиність** - один Runnable інтерфейс для всього
+3. **Гнучкість** - легко комбінувати компоненти
+4. **Продуктивність** - автоматична batch оптимізація
+5. **Простота** - менше коду, більше ясності
+
+### Чому LangGraph важливий?
+
+1. **Прозорість** - граф замість чорної скриньки
+2. **Контроль** - повне управління логікою
+3. **Persistence** - checkpointing з коробки
+4. **Складність** - підтримка циклів та умов
+5. **Дебаг** - легко знайти проблеми
+
+### Коли використовувати?
+
+**Використовуйте LCEL коли:**
+- Будуєте ланцюги обробки
+- Потрібен RAG
+- Комбінуєте промпти та моделі
+- Потрібен streaming або batch
+
+**Використовуйте LangGraph коли:**
+- Будуєте складних агентів
+- Потрібні цикли та умови
+- Потрібна пам'ять між викликами
+- Потрібен human-in-the-loop
+- Хочете візуалізувати логіку
+
+---
+
+## 📁 Файли в репозиторії
+
+```
+module5/
+├── 01_migration_chains_comparison.py   # Порівняння ланцюгів v0.x → v1.0
+├── 02_migration_agents_comparison.py   # Порівняння агентів
+├── 03_real_world_example.py            # Реальний приклад еволюції
+├── MIGRATION_GUIDE.md                  # Повний гід з міграції
+├── README.md                           # Цей файл
+├── requirements.txt                    # Залежності
+├── .env.example                        # Приклад конфігурації
+└── .gitignore                          # Git ignore
 ```
 
 ---
 
-### 7. `langgraph_v1_human_in_loop.py` - Human-in-the-Loop
+## 🔧 Технології
 
-**Ключові можливості:**
-- ✅ Workflow з підтвердженням людини
-- ✅ Переривання для вводу
-- ✅ Умовне схвалення
-- ✅ Цикли зворотного зв'язку
-- ✅ Інтерактивні агенти
-
-**Приклад використання:**
-```python
-def should_get_approval(state: State) -> str:
-    if state["requires_approval"]:
-        return "approval"
-    return "execute"
-
-workflow.add_conditional_edges(
-    "agent",
-    should_get_approval,
-    {
-        "approval": "human_approval_node",
-        "execute": "execute_node"
-    }
-)
-```
-
-**Запуск:**
-```bash
-python langgraph_v1_human_in_loop.py
-```
+- **LangChain** >= 0.1.0 (LCEL підтримка)
+- **LangGraph** >= 0.0.20 (State graphs)
+- **LangChain OpenAI** (LLM інтеграція)
+- **FAISS** (Векторна база для RAG)
+- **Pydantic** v2 (Structured output)
 
 ---
 
-## 🎯 Ключові Нововведення
+## 📖 Додаткові ресурси
 
-### LangChain v1.0
+### Офіційна документація
+- [LangChain v1.0 Docs](https://python.langchain.com/)
+- [LCEL Guide](https://python.langchain.com/docs/expression_language/)
+- [LangGraph Docs](https://langchain-ai.github.io/langgraph/)
+- [Migration Guide (Official)](https://python.langchain.com/docs/migration/)
 
-| Нововведення | Опис | Скрипт |
-|--------------|------|--------|
-| **LCEL** | Новий спосіб композиції з оператором `\|` | `langchain_v1_lcel.py` |
-| **Runnable Interface** | Уніфікований інтерфейс (invoke, stream, batch) | Всі скрипти |
-| **Structured Output** | Pydantic моделі для типізованих даних | `langchain_v1_structured_output.py` |
-| **Parallel Chains** | RunnableParallel для паралельного виконання | `langchain_v1_lcel.py` |
-| **Streaming** | Покращена підтримка стрімінгу | `langchain_v1_rag.py` |
-| **Function Calling** | with_structured_output() | `langchain_v1_structured_output.py` |
+### Наші гіди
+- `MIGRATION_GUIDE.md` - детальний чек-лист міграції
+- Коментарі в кожному скрипті
+- Side-by-side порівняння старого та нового коду
 
-### LangGraph 1.0
+---
 
-| Нововведення | Опис | Скрипт |
-|--------------|------|--------|
-| **State Graphs** | Побудова графів станів для агентів | `langgraph_v1_basics.py` |
-| **Conditional Edges** | Умовні переходи між вузлами | `langgraph_v1_basics.py` |
-| **Cycles** | Підтримка циклів в графах | `langgraph_v1_basics.py` |
-| **Checkpointing** | Збереження та відновлення стану | `langgraph_v1_persistence.py` |
-| **Human-in-Loop** | Інтеграція людини в процес | `langgraph_v1_human_in_loop.py` |
-| **ToolNode** | Спрощене виконання інструментів | `langgraph_v1_agents.py` |
-| **Memory Saver** | Збереження історії розмов | `langgraph_v1_persistence.py` |
+## 🤝 Для кого цей репозиторій?
 
-## 💡 Використання
+✅ **Ви вже використовуєте LangChain v0.x** і хочете мігрувати на v1.0
+✅ **Вивчаєте LangChain** і хочете зрозуміти чому v1.0 краще
+✅ **Розглядаєте LangGraph** і хочете побачити реальні переваги
+✅ **Будуєте AI застосунки** і шукаєте best practices
 
-### Запуск окремого скрипта:
-```bash
-python langchain_v1_lcel.py
-```
+---
 
-### Запуск всіх LangChain демо:
-```bash
-python langchain_v1_lcel.py
-python langchain_v1_structured_output.py
-python langchain_v1_rag.py
-```
+## 🎯 Чого очікувати
 
-### Запуск всіх LangGraph демо:
-```bash
-python langgraph_v1_basics.py
-python langgraph_v1_agents.py
-python langgraph_v1_persistence.py
-python langgraph_v1_human_in_loop.py
-```
+Після проходження цих прикладів ви:
 
-## 📖 Додаткові Ресурси
+- ✅ Зрозумієте **чому** v1.0 краще ніж v0.x
+- ✅ Навчитесь будувати ланцюги через **LCEL**
+- ✅ Зможете створювати **stateful агентів** з LangGraph
+- ✅ Матимете **production-ready** приклад бота
+- ✅ Будете готові **мігрувати** свій код
 
-- [LangChain Documentation](https://python.langchain.com/)
-- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
-- [LangSmith](https://smith.langchain.com/)
-
-## 🤝 Внесок
-
-Ці скрипти створені для навчальних цілей та демонстрації можливостей LangChain v1.0 та LangGraph 1.0.
+---
 
 ## 📝 Ліцензія
 
@@ -345,6 +330,35 @@ MIT License
 
 ---
 
-**Автор:** Claude Agent
+**Версія:** 2.0 (Migration Focus)
 **Дата:** 2024
-**Версія:** 1.0
+**Автор:** Claude Agent
+
+---
+
+## ⚡ TL;DR
+
+**v0.x:**
+```python
+chain = LLMChain(llm=llm, prompt=prompt)
+result = chain.run(input)  # Deprecated, багато boilerplate
+```
+
+**v1.0:**
+```python
+chain = prompt | model | output_parser
+result = chain.invoke(input)  # Чисто, інтуїтивно, потужно
+```
+
+**Без LangGraph:**
+```python
+agent_executor = AgentExecutor(...)  # Чорна скринька
+```
+
+**З LangGraph:**
+```python
+workflow = StateGraph(...)  # Повний контроль, візуалізація, checkpointing
+app = workflow.compile(checkpointer=MemorySaver())
+```
+
+**Запустіть приклади та побачите різницю! 🚀**
