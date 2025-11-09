@@ -6,7 +6,7 @@ Production-ready agent implementations showcasing key innovations in LangChain 1
 
 This repository contains three comprehensive agent examples demonstrating the latest LangChain/LangGraph patterns:
 
-1. **Basic Agent** - ReAct agent using `create_react_agent` API
+1. **Basic Agent** - Agent using `create_agent` API (LangChain 1.0)
 2. **Middleware Agent** - Agent with before/after/modify hooks
 3. **RAG Agent** - Agentic RAG with LangGraph StateGraph and checkpointing
 
@@ -15,7 +15,7 @@ All agents include **LangSmith tracing** for full observability.
 ## Features
 
 ### LangChain 1.0 (October 2025)
-- ✅ `create_react_agent()` - Modern agent creation API
+- ✅ `create_agent()` - New unified agent creation API
 - ✅ Middleware architecture with three hooks
 - ✅ Stable APIs (no breaking changes until 2.0)
 - ✅ Production-ready patterns
@@ -59,11 +59,11 @@ LANGCHAIN_PROJECT=langchain-v1-agents
 
 ### 1. Basic Agent (01_basic_agent.py)
 
-**Purpose:** Demonstrates the modern `create_react_agent` API with multiple tools.
+**Purpose:** Demonstrates the LangChain 1.0 `create_agent` API with multiple tools.
 
-**Pattern:** ReAct (Reasoning and Acting)
+**Pattern:** Automatic Agent Orchestration
 ```
-User Query → Think → Act (use tool) → Observe → Think → Answer
+User Query → Agent → Tool Selection → Tool Execution → Response
 ```
 
 **Tools:**
@@ -77,7 +77,8 @@ python 01_basic_agent.py
 ```
 
 **Key Features:**
-- Uses `create_react_agent` (v1.0 API, not deprecated AgentExecutor)
+- Uses `create_agent` (LangChain 1.0 API - October 2025)
+- Automatic prompt optimization
 - Error handling with `handle_parsing_errors=True`
 - Max iterations limit for safety
 - Returns intermediate steps for debugging
@@ -268,9 +269,9 @@ AgentExecutor
 
 ## Architecture Patterns
 
-### ReAct Pattern (Agent 1)
+### LangChain 1.0 Pattern (Agent 1)
 ```python
-agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
+agent = create_agent(llm=llm, tools=tools)
 executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 result = executor.invoke({"input": query})
 ```
@@ -328,8 +329,8 @@ app = workflow.compile(checkpointer=checkpointer)
 
 ## Troubleshooting
 
-**Issue:** `ImportError: cannot import name 'create_react_agent'`
-- **Fix:** Ensure `langchain>=1.0.0` is installed
+**Issue:** `ImportError: cannot import name 'create_agent'`
+- **Fix:** Ensure `langchain>=1.0.0` is installed (October 2025 release)
 
 **Issue:** LangSmith traces not appearing
 - **Fix:** Check `.env` has `LANGCHAIN_TRACING_V2=true` and valid `LANGCHAIN_API_KEY`
@@ -352,8 +353,8 @@ agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION
 
 **New (v1.0):**
 ```python
-from langchain.agents import create_react_agent, AgentExecutor
-agent = create_react_agent(llm, tools, prompt)
+from langchain.agents import create_agent, AgentExecutor
+agent = create_agent(llm, tools)
 executor = AgentExecutor(agent=agent, tools=tools)
 ```
 
