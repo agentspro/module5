@@ -39,15 +39,21 @@ else:
 
 @tool
 def get_stock_price(symbol: str) -> str:
-    """Get current stock price for a symbol."""
-    # Mock data
-    prices = {
-        "AAPL": "$175.50",
-        "GOOGL": "$140.20",
-        "MSFT": "$380.00",
-        "TSLA": "$245.80"
-    }
-    return prices.get(symbol.upper(), f"Price for {symbol} not found")
+    """Get real-time stock price using yfinance API."""
+    try:
+        import yfinance as yf
+
+        ticker = yf.Ticker(symbol)
+        data = ticker.history(period="1d")
+
+        if data.empty:
+            return f"No data found for symbol {symbol}"
+
+        current_price = data['Close'].iloc[-1]
+        return f"${current_price:.2f}"
+
+    except Exception as e:
+        return f"Error fetching price for {symbol}: {str(e)}"
 
 
 @tool
