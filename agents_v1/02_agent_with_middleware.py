@@ -1,20 +1,22 @@
 """
-АГЕНТ З MIDDLEWARE - LangChain 1.0 API
-На базі документації: Agent Middleware API (2025)
+АГЕНТ З MIDDLEWARE - LangChain 1.0 ОФІЦІЙНИЙ API
+На базі офіційної документації: AgentMiddleware API (2025)
 
-Middleware hooks:
+ОФІЦІЙНИЙ LANGCHAIN 1.0 MIDDLEWARE API:
+- AgentMiddleware базовий клас
 - before_model: Runs before model calls
 - after_model: Runs after model calls
-- modify_model_request: Modify tools, prompts, messages before model call
+- wrap_model_call: Modify request/response
 
 LangSmith Integration: Автоматично трейсить всі middleware operations
 """
 
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, Optional
 from langchain_core.tools import tool
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain.agents.middleware import AgentMiddleware, AgentState, ModelRequest, ModelRequestHandler
+from langchain_core.messages import AIMessage
 from dotenv import load_dotenv
 import json
 from datetime import datetime
@@ -28,7 +30,7 @@ load_dotenv()
 if os.getenv("LANGCHAIN_TRACING_V2") == "true":
     print("OK LangSmith трейсинг активний")
     print(f"Stats: Project: {os.getenv('LANGCHAIN_PROJECT', 'default')}")
-    print("🔍 Middleware operations will be traced\n")
+    print("Middleware operations will be traced\n")
 else:
     print("WARNING  LangSmith не ввімкнений\n")
 
@@ -82,60 +84,80 @@ def execute_trade(symbol: str, quantity: int, action: str) -> str:
 
 
 # ============================================================================
-# MIDDLEWARE IMPLEMENTATIONS
+# ОФІЦІЙНІ MIDDLEWARE КЛАСИ - LangChain 1.0 API
 # ============================================================================
 
-class LoggingMiddleware:
+class LoggingMiddleware(AgentMiddleware):
     """
-    Middleware для логування всіх model calls
-    Implements: before_model, after_model hooks
+    Офіційний LangChain 1.0 Middleware для логування
+    Використовує before_model та after_model hooks
     """
 
     def __init__(self):
+        super().__init__()
         self.call_count = 0
         self.logs = []
 
-    def before_model(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """Виконується ПЕРЕД кожним викликом моделі"""
+    def before_model(self, state: AgentState, runtime: Any) -> Optional[Dict[str, Any]]:
+        """
+        Виконується ПЕРЕД кожним викликом моделі
+
+        Args:
+            state: Поточний стан агента
+            runtime: Runtime об'єкт з контекстом
+
+        Returns:
+            Dict з оновленнями стану або None
+        """
         self.call_count += 1
 
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "call_number": self.call_count,
             "event": "before_model",
-            "input_length": len(str(state.get("messages", ""))),
+            "message_count": len(state.get("messages", [])),
         }
 
         self.logs.append(log_entry)
 
         print(f"\n{'='*60}")
         print(f"LOG MIDDLEWARE: Before Model Call #{self.call_count}")
-        print(f"Time: Time: {log_entry['timestamp']}")
-        print(f"Stats: Input length: {log_entry['input_length']} chars")
+        print(f"Time: {log_entry['timestamp']}")
+        print(f"Stats: Messages: {log_entry['message_count']}")
         print(f"{'='*60}\n")
 
-        # Можна модифікувати state тут
-        return state
+        # Повертаємо None - не змінюємо state
+        return None
 
-    def after_model(self, state: Dict[str, Any], result: Any) -> Dict[str, Any]:
-        """Виконується ПІСЛЯ кожного виклику моделі"""
+    def after_model(self, state: AgentState, runtime: Any) -> Optional[Dict[str, Any]]:
+        """
+        Виконується ПІСЛЯ кожного виклику моделі
+
+        Args:
+            state: Оновлений стан після виклику моделі
+            runtime: Runtime об'єкт з контекстом
+
+        Returns:
+            Dict з оновленнями стану або None
+        """
+        last_message = state.get("messages", [])[-1] if state.get("messages") else None
 
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "call_number": self.call_count,
             "event": "after_model",
-            "result_type": type(result).__name__,
+            "response_type": type(last_message).__name__ if last_message else "None",
         }
 
         self.logs.append(log_entry)
 
         print(f"\n{'='*60}")
         print(f"OK MIDDLEWARE: After Model Call #{self.call_count}")
-        print(f"Time: Time: {log_entry['timestamp']}")
-        print(f"Output: Result type: {log_entry['result_type']}")
+        print(f"Time: {log_entry['timestamp']}")
+        print(f"Output: {log_entry['response_type']}")
         print(f"{'='*60}\n")
 
-        return state
+        return None
 
     def get_stats(self):
         """Повертає статистику викликів"""
@@ -145,112 +167,97 @@ class LoggingMiddleware:
         }
 
 
-class SecurityMiddleware:
+class SecurityMiddleware(AgentMiddleware):
     """
-    Middleware для безпеки - блокує небезпечні операції без approval
-    Implements: modify_model_request hook
+    Офіційний LangChain 1.0 Middleware для безпеки
+    Використовує wrap_model_call для модифікації запитів
     """
 
     def __init__(self):
-        self.blocked_actions = []
-        self.approved_actions = []
-
-        # Список high-risk tools що потребують approval
+        super().__init__()
         self.high_risk_tools = ["execute_trade", "send_notification"]
+        self.calls_blocked = 0
 
-    def modify_model_request(self, tools: List, messages: List, **kwargs) -> Dict[str, Any]:
+    def wrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: ModelRequestHandler
+    ) -> AIMessage:
         """
-        Модифікує request перед відправкою до моделі
-        Може змінити: tools, messages, prompt, model settings
+        Обгортає виклик моделі для перевірки безпеки
+
+        Args:
+            request: ModelRequest з tools, messages, model
+            handler: Функція для виконання запиту
+
+        Returns:
+            AIMessage з результатом
         """
+        # Перевіряємо чи є high-risk tools у запиті
+        messages_text = " ".join([str(m) for m in request.state.get("messages", [])])
 
-        print(f"\n{'='*60}")
-        print("SECURITY SECURITY MIDDLEWARE: Checking request")
-        print(f"{'='*60}\n")
+        has_risky_request = any(
+            tool_name.lower() in messages_text.lower()
+            for tool_name in self.high_risk_tools
+        )
 
-        # Перевіряємо чи є в messages згадки high-risk actions
-        full_text = " ".join([str(m) for m in messages])
+        if has_risky_request:
+            print(f"\nSECURITY SECURITY MIDDLEWARE:")
+            print(f"   Detected HIGH-RISK tool request")
+            print(f"   Tools: {', '.join(self.high_risk_tools)}")
+            print(f"   ACTION: Filtering out risky tools\n")
 
-        for risky_tool in self.high_risk_tools:
-            if risky_tool in full_text.lower() or "trade" in full_text.lower():
-                print(f"WARNING  Detected potential use of HIGH-RISK tool: {risky_tool}")
-                print(f"Shield:  Security check required\n")
+            self.calls_blocked += 1
 
-                # Симулюємо approval process
-                # В production тут був би real approval workflow
-                approval = self._request_approval(risky_tool, full_text)
+            # Фільтруємо risky tools
+            safe_tools = [
+                tool for tool in request.tools
+                if tool.name not in self.high_risk_tools
+            ]
 
-                if not approval:
-                    # Блокуємо high-risk tools
-                    print(f"BLOCKED: BLOCKED: {risky_tool} requires approval\n")
-                    self.blocked_actions.append({
-                        "tool": risky_tool,
-                        "timestamp": datetime.now().isoformat()
-                    })
+            # Створюємо новий request без risky tools
+            modified_request = request.replace(tools=safe_tools)
 
-                    # Видаляємо risky tool зі списку доступних
-                    tools = [t for t in tools if t.name != risky_tool]
+            return handler(modified_request)
 
-                    # Додаємо warning до messages
-                    warning_msg = {
-                        "role": "system",
-                        "content": f"SECURITY WARNING: Tool '{risky_tool}' is blocked due to security policy. Inform user that this action requires manual approval. Suggest alternative safe actions."
-                    }
-                    messages = [warning_msg] + messages
-
-        print("OK Security check complete\n")
-
-        return {
-            "tools": tools,
-            "messages": messages,
-            **kwargs
-        }
-
-    def _request_approval(self, tool_name: str, context: str) -> bool:
-        """
-        Симулює approval process
-        В production це був би call to approval service або human-in-the-loop
-        """
-
-        print(f"📋 Requesting approval for: {tool_name}")
-        print(f"📄 Context: {context[:100]}...")
-
-        # Mock approval logic
-        # В реальності тут був би pause для human approval
-        auto_approve = False
-
-        if auto_approve:
-            print("OK Approved automatically (mock)\n")
-            self.approved_actions.append(tool_name)
-            return True
-        else:
-            print("ERROR: Auto-approval disabled - action blocked\n")
-            return False
+        # Якщо нема ризикових інструментів - пропускаємо як є
+        return handler(request)
 
     def get_stats(self):
-        """Статистика security middleware"""
+        """Повертає статистику блокувань"""
         return {
-            "blocked_actions": self.blocked_actions,
-            "approved_actions": self.approved_actions
+            "calls_blocked": self.calls_blocked,
+            "high_risk_tools": self.high_risk_tools
         }
 
 
-class TokenLimitMiddleware:
+class TokenLimitMiddleware(AgentMiddleware):
     """
-    Middleware для контролю витрат tokens
-    Implements: before_model hook
+    Офіційний LangChain 1.0 Middleware для контролю token usage
+    Використовує before_model для перевірки лімітів
     """
 
-    def __init__(self, max_tokens_per_call: int = 1000):
+    def __init__(self, max_tokens_per_call: int = 4000):
+        super().__init__()
         self.max_tokens_per_call = max_tokens_per_call
         self.total_tokens_used = 0
         self.calls_throttled = 0
 
-    def before_model(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """Перевіряє і обмежує token usage"""
+    def before_model(self, state: AgentState, runtime: Any) -> Optional[Dict[str, Any]]:
+        """
+        Перевіряє і обмежує token usage перед викликом
 
-        input_text = str(state.get("messages", ""))
-        estimated_tokens = len(input_text.split()) * 1.3  # Rough estimate
+        Args:
+            state: Поточний стан
+            runtime: Runtime контекст
+
+        Returns:
+            Dict з оновленнями або None
+        """
+        # Оцінюємо кількість токенів (приблизно)
+        messages = state.get("messages", [])
+        total_text = " ".join([str(m) for m in messages])
+        estimated_tokens = len(total_text.split()) * 1.3  # Rough estimate
 
         print(f"\nTOKEN TOKEN MIDDLEWARE:")
         print(f"   Estimated input tokens: ~{int(estimated_tokens)}")
@@ -261,205 +268,164 @@ class TokenLimitMiddleware:
             print(f"   WARNING  WARNING: Input may exceed token limit!")
             self.calls_throttled += 1
 
-            # В production тут можна truncate input або block call
-            print(f"   Retry: Truncating input to fit limit\n")
+            # В production тут можна truncate messages
+            print(f"   Retry: Proceeding with warning\n")
+        else:
+            print()
 
-        print()
-        return state
+        # Оновлюємо total usage
+        self.total_tokens_used += int(estimated_tokens)
 
+        return None
 
-# ============================================================================
-# MIDDLEWARE AGENT WRAPPER - LangChain 1.0
-# ============================================================================
-
-class MiddlewareAgent:
-    """
-    Wrapper навколо create_agent який додає middleware functionality
-
-    LangChain 1.0 API: create_agent повертає готовий agent
-    Ми обгортаємо його invoke() методом для додавання middleware hooks
-    """
-
-    def __init__(self, model: str, tools: List, system_prompt: str, middlewares: List = None):
-        self.tools = tools
-        self.middlewares = middlewares or []
-
-        # Створюємо base agent через create_agent
-        self.agent = create_agent(
-            model=model,
-            tools=tools,
-            system_prompt=system_prompt
-        )
-
-    def invoke(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Викликає agent з middleware hooks
-
-        Flow:
-        1. before_model middlewares
-        2. modify_model_request middlewares
-        3. agent.invoke()
-        4. after_model middlewares
-        """
-
-        # Before model middlewares
-        for mw in self.middlewares:
-            if hasattr(mw, 'before_model'):
-                inputs = mw.before_model(inputs)
-
-        # Modify request middlewares
-        tools_to_use = self.tools
-        messages = inputs.get("messages", [])
-
-        for mw in self.middlewares:
-            if hasattr(mw, 'modify_model_request'):
-                modifications = mw.modify_model_request(
-                    tools=tools_to_use,
-                    messages=messages,
-                )
-                tools_to_use = modifications.get('tools', tools_to_use)
-                messages = modifications.get('messages', messages)
-
-        # Оновлюємо messages після middleware
-        modified_inputs = {**inputs, "messages": messages}
-
-        # Execute agent
-        result = self.agent.invoke(modified_inputs)
-
-        # After model middlewares
-        for mw in self.middlewares:
-            if hasattr(mw, 'after_model'):
-                inputs = mw.after_model(inputs, result)
-
-        return result
+    def get_stats(self):
+        """Повертає статистику використання"""
+        return {
+            "total_tokens_used": self.total_tokens_used,
+            "calls_throttled": self.calls_throttled,
+            "max_tokens_per_call": self.max_tokens_per_call
+        }
 
 
 # ============================================================================
-# СТВОРЕННЯ АГЕНТА З MIDDLEWARE
+# СТВОРЕННЯ АГЕНТА З MIDDLEWARE - ОФІЦІЙНИЙ API
 # ============================================================================
 
 def create_agent_with_middleware():
     """
-    Створює агента з middleware hooks використовуючи LangChain 1.0 API
+    Створює агента з middleware hooks використовуючи ОФІЦІЙНИЙ LangChain 1.0 API
+
+    ВАЖЛИВО: Використовується параметр middleware=[] в create_agent
 
     Middleware stack:
     1. LoggingMiddleware - logs all calls
     2. SecurityMiddleware - blocks risky operations
     3. TokenLimitMiddleware - controls costs
     """
-
     print("=" * 70)
-    print("Shield:  AGENT WITH MIDDLEWARE - LangChain 1.0")
+    print("AGENT АГЕНТ З MIDDLEWARE - LangChain 1.0 (ОФІЦІЙНИЙ API)")
     print("=" * 70 + "\n")
 
-    # Initialize middlewares
+    # Створюємо middleware instances
     logging_mw = LoggingMiddleware()
     security_mw = SecurityMiddleware()
-    token_mw = TokenLimitMiddleware(max_tokens_per_call=500)
-
-    print("Middleware Stack:")
-    print("  1.  LoggingMiddleware - Track all operations")
-    print("  2.  SecurityMiddleware - Block risky actions")
-    print("  3.  TokenLimitMiddleware - Control costs")
-    print()
+    token_mw = TokenLimitMiddleware(max_tokens_per_call=4000)
 
     # Tools
     tools = [get_stock_price, send_notification, execute_trade]
 
     print("Available tools:")
-    for t in tools:
-        risk = "HIGH-RISK HIGH-RISK" if t.name in security_mw.high_risk_tools else "SAFE SAFE"
-        print(f"  • {t.name}: {risk}")
+    for tool in tools:
+        risk = " (HIGH-RISK)" if tool.name in security_mw.high_risk_tools else ""
+        print(f"  • {tool.name}{risk}")
     print()
 
-    # Create agent with middleware (LangChain 1.0 API)
-    agent = MiddlewareAgent(
+    print("Middleware stack (ОФІЦІЙНИЙ LangChain 1.0 API):")
+    print("  1. LoggingMiddleware (before_model + after_model)")
+    print("  2. SecurityMiddleware (wrap_model_call)")
+    print("  3. TokenLimitMiddleware (before_model)")
+    print()
+
+    # ОФІЦІЙНИЙ API: middleware передається в create_agent
+    agent = create_agent(
         model="gpt-4o-mini",
         tools=tools,
-        system_prompt="""You are a helpful AI assistant with access to financial tools.
+        system_prompt="""You are a financial assistant with access to stock data and notification tools.
 
-Use the available tools to answer user questions accurately.
-Always provide clear, helpful responses.""",
-        middlewares=[logging_mw, security_mw, token_mw]
+You can:
+- Get real-time stock prices
+- Send notifications (requires approval)
+- Execute trades (high-risk, requires approval)
+
+Always explain your actions and ask for confirmation before risky operations.""",
+        middleware=[logging_mw, security_mw, token_mw]  # ОФІЦІЙНИЙ API
     )
 
-    return agent, {
-        "logging": logging_mw,
-        "security": security_mw,
-        "tokens": token_mw
-    }
+    return agent, logging_mw, security_mw, token_mw
 
 
 # ============================================================================
-# TESTING
+# ТЕСТУВАННЯ АГЕНТА З MIDDLEWARE
 # ============================================================================
 
-def test_middleware_agent():
-    """Test agent with middleware"""
+def test_agent_with_middleware():
+    """Тестує агента з різними middleware scenarios"""
 
-    agent, middlewares = create_agent_with_middleware()
+    agent, logging_mw, security_mw, token_mw = create_agent_with_middleware()
 
-    test_cases = [
+    test_queries = [
         {
-            "name": "Safe Query",
-            "input": "What's the current price of AAPL?",
-            "expected": "Should work normally"
+            "query": "What's the current price of AAPL stock?",
+            "description": "Safe query - should pass all middleware",
+            "expected": "get_stock_price tool call"
         },
         {
-            "name": "Risky Action",
-            "input": "Execute a trade: buy 100 shares of TSLA",
-            "expected": "Should be BLOCKED by security middleware"
+            "query": "Get TSLA price and send me notification about it",
+            "description": "Contains HIGH-RISK tool - should be blocked by security",
+            "expected": "SecurityMiddleware blocks send_notification"
         },
         {
-            "name": "Multiple Tools",
-            "input": "Get GOOGL price and notify john@example.com about it",
-            "expected": "Notification should be blocked"
+            "query": "Execute trade: buy 100 shares of GOOGL",
+            "description": "HIGH-RISK action - should be blocked",
+            "expected": "SecurityMiddleware blocks execute_trade"
         }
     ]
 
-    for i, test in enumerate(test_cases, 1):
+    for i, test in enumerate(test_queries, 1):
         print("\n" + "=" * 70)
-        print(f"TEST {i}: {test['name']}")
-        print(f"Input: {test['input']}")
-        print(f"Expected: {test['expected']}")
+        print(f"TEST {i}: {test['description']}")
         print("=" * 70)
+        print(f"Query: {test['query']}")
+        print(f"Expected: {test['expected']}")
+        print("-" * 70 + "\n")
 
         try:
-            # LangChain 1.0 API: invoke приймає messages
+            # ОФІЦІЙНИЙ API: прямий invoke - middleware спрацюють автоматично
             result = agent.invoke({
-                "messages": [{"role": "user", "content": test["input"]}]
+                "messages": [{"role": "user", "content": test["query"]}]
             })
 
-            # Extract output від agent
+            print("\n" + "-" * 70)
+            print("RESULT:")
+            print("-" * 70)
+
             if isinstance(result, dict) and "messages" in result:
                 last_message = result["messages"][-1]
-                output = last_message.content if hasattr(last_message, "content") else str(last_message)
+                if hasattr(last_message, "content"):
+                    print(f"Output: {last_message.content}\n")
+                else:
+                    print(f"Output: {last_message}\n")
             else:
-                output = str(result)
-
-            print(f"\nOK Result: {output}")
+                print(f"Output: {result}\n")
 
         except Exception as e:
-            print(f"\nERROR: Error: {e}")
+            print(f"\nERROR: {e}\n")
             import traceback
             traceback.print_exc()
 
-        input("\nPAUSE  Press Enter for next test...")
+        input("\nPAUSE  Press Enter to continue to next test...\n")
 
-    # Print middleware stats
+    # Виводимо статистику всіх middleware
     print("\n" + "=" * 70)
-    print("Stats: MIDDLEWARE STATISTICS")
-    print("=" * 70)
+    print("MIDDLEWARE STATISTICS")
+    print("=" * 70 + "\n")
 
-    print(f"\nLOG Logging Middleware:")
-    print(json.dumps(middlewares["logging"].get_stats(), indent=2))
+    print("Logging Middleware:")
+    logging_stats = logging_mw.get_stats()
+    print(f"  Total calls: {logging_stats['total_calls']}")
+    print()
 
-    print(f"\nSECURITY Security Middleware:")
-    print(json.dumps(middlewares["security"].get_stats(), indent=2))
+    print("Security Middleware:")
+    security_stats = security_mw.get_stats()
+    print(f"  Calls blocked: {security_stats['calls_blocked']}")
+    print(f"  High-risk tools: {', '.join(security_stats['high_risk_tools'])}")
+    print()
 
-    print(f"\nTOKEN Token Middleware:")
-    print(f"   Calls throttled: {middlewares['tokens'].calls_throttled}")
-    print(f"   Total tokens tracked: {middlewares['tokens'].total_tokens_used}")
+    print("Token Limit Middleware:")
+    token_stats = token_mw.get_stats()
+    print(f"  Total tokens used: {token_stats['total_tokens_used']}")
+    print(f"  Calls throttled: {token_stats['calls_throttled']}")
+    print()
 
 
 # ============================================================================
@@ -467,33 +433,39 @@ def test_middleware_agent():
 # ============================================================================
 
 if __name__ == "__main__":
-    print("\nTARGET LangChain 1.0 - Agent with Middleware")
+    print("\n")
+    print("TARGET LangChain 1.0 - Agent with OFFICIAL Middleware API")
     print("=" * 70)
-    print("\nMiddleware Features (2025 API):")
-    print("  OK before_model hook - Pre-processing")
-    print("  OK after_model hook - Post-processing")
-    print("  OK modify_model_request - Request modification")
-    print("  OK Security controls - Block risky operations")
-    print("  OK Token limiting - Cost control")
-    print("  OK LangSmith tracing - Full observability")
-    print("  OK LangChain 1.0 create_agent API")
-    print("\n" + "=" * 70 + "\n")
+    print()
+    print("Features:")
+    print("  OK ОФІЦІЙНИЙ AgentMiddleware API")
+    print("  OK before_model + after_model hooks")
+    print("  OK wrap_model_call для модифікації")
+    print("  OK Real financial data (yfinance)")
+    print("  OK Security middleware (blocks risky tools)")
+    print("  OK Token limiting middleware")
+    print("  OK LangSmith automatic tracing")
+    print()
+    print("=" * 70 + "\n")
 
+    # Перевірка API ключів
     if not os.getenv("OPENAI_API_KEY"):
-        print("ERROR: ERROR: OPENAI_API_KEY not found!")
+        print("ERROR: OPENAI_API_KEY not found in environment!")
+        print("Please set it in .env file")
         exit(1)
 
     try:
-        test_middleware_agent()
+        test_agent_with_middleware()
 
         print("\n" + "=" * 70)
-        print("OK ALL MIDDLEWARE TESTS COMPLETED")
+        print("OK ALL TESTS COMPLETED")
         print("=" * 70)
-        print("\nTIP: Check LangSmith for detailed middleware traces!\n")
+        print("\nTIP: Check LangSmith dashboard to see middleware traces:")
+        print("   https://smith.langchain.com/\n")
 
     except KeyboardInterrupt:
-        print("\n\n⏹️  Interrupted")
+        print("\n\nTests interrupted by user")
     except Exception as e:
-        print(f"\nERROR: Error: {e}")
+        print(f"\n\nERROR: {e}")
         import traceback
         traceback.print_exc()
