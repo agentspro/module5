@@ -6,10 +6,8 @@ LangSmith Integration: Автоматично ввімкнений через en
 """
 
 import os
-from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
-from langchain.agents import create_react_agent, AgentExecutor
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.agents import create_agent
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,13 +22,13 @@ load_dotenv()
 # LANGCHAIN_PROJECT=langchain-agents-v1
 
 if not os.getenv("LANGCHAIN_TRACING_V2"):
-    print("⚠️  LangSmith трейсинг не ввімкнено. Додайте в .env:")
+    print("WARNING  LangSmith трейсинг не ввімкнено. Додайте в .env:")
     print("LANGCHAIN_TRACING_V2=true")
     print("LANGCHAIN_API_KEY=your_key")
     print("LANGCHAIN_PROJECT=langchain-agents-v1\n")
 else:
-    print("✅ LangSmith трейсинг активний")
-    print(f"📊 Project: {os.getenv('LANGCHAIN_PROJECT', 'default')}\n")
+    print("OK LangSmith трейсинг активний")
+    print(f"Stats: Project: {os.getenv('LANGCHAIN_PROJECT', 'default')}\n")
 
 
 # ============================================================================
@@ -50,10 +48,10 @@ def get_weather(location: str) -> str:
     """
     # Mock implementation - в production це був би API виклик
     weather_db = {
-        "london": "🌧️ Rainy, 12°C",
-        "kyiv": "☀️ Sunny, 18°C",
-        "new york": "⛅ Partly cloudy, 15°C",
-        "tokyo": "🌸 Clear, 22°C",
+        "london": "Rainy Rainy, 12°C",
+        "kyiv": "Sunny Sunny, 18°C",
+        "new york": "Partly cloudy Partly cloudy, 15°C",
+        "tokyo": "Clear Clear, 22°C",
     }
 
     location_lower = location.lower()
@@ -110,7 +108,7 @@ def search_docs(query: str) -> str:
     results = []
     for topic, info in docs.items():
         if topic in query_lower or query_lower in info.lower():
-            results.append(f"📚 {topic.title()}: {info}")
+            results.append(f"KB: {topic.title()}: {info}")
 
     return "\n\n".join(results) if results else f"No documentation found for '{query}'"
 
@@ -123,72 +121,37 @@ def create_basic_agent():
     """
     Створює базового агента з LangChain 1.0 API
 
-    Uses:
-    - create_react_agent: Створює ReAct-style агента
-    - AgentExecutor: Виконує агента з tools
+    В LangChain 1.0:
+    - create_agent приймає model (string), tools (list), system_prompt (string)
+    - Автоматично створює оптимальний промпт
+    - Повертає agent який можна викликати через .invoke()
+    - Не потрібен AgentExecutor
     """
     print("=" * 70)
-    print("🤖 БАЗОВИЙ АГЕНТ - LangChain 1.0")
+    print("AGENT БАЗОВИЙ АГЕНТ - LangChain 1.0")
     print("=" * 70 + "\n")
 
-    # 1. Ініціалізація LLM
-    llm = ChatOpenAI(
-        model="gpt-4o-mini",  # or gpt-3.5-turbo for cheaper option
-        temperature=0,
-        model_kwargs={"response_format": {"type": "text"}}
-    )
-
-    # 2. Список tools
+    # 1. Список tools
     tools = [get_weather, calculate, search_docs]
 
     print("Available tools:")
-    for tool in tools:
-        print(f"  • {tool.name}: {tool.description[:60]}...")
+    for tool_item in tools:
+        print(f"  • {tool_item.name}: {tool_item.description[:60]}...")
     print()
 
-    # 3. Створення промпта для ReAct агента
-    # ReAct format: Thought → Action → Observation → ... → Final Answer
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a helpful AI assistant with access to tools.
-
-Use the following format:
-
-Question: the input question you must answer
-Thought: think about what you should do
-Action: the action to take (should be one of [{tool_names}])
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question
-
-Tools available:
-{tools}
-
-Begin!
-
-Question: {input}
-{agent_scratchpad}"""),
-    ])
-
-    # 4. Створення ReAct агента
-    agent = create_react_agent(
-        llm=llm,
+    # 2. Створення агента (LangChain 1.0 API)
+    # Передаємо model як string, а не ChatOpenAI об'єкт!
+    agent = create_agent(
+        model="gpt-4o-mini",  # або "gpt-3.5-turbo"
         tools=tools,
-        prompt=prompt
+        system_prompt="""You are a helpful AI assistant with access to tools.
+
+Use the available tools to answer user questions accurately.
+When you need information, use the appropriate tool.
+Always provide clear, helpful responses."""
     )
 
-    # 5. Створення Agent Executor
-    agent_executor = AgentExecutor(
-        agent=agent,
-        tools=tools,
-        verbose=True,  # Show reasoning process
-        handle_parsing_errors=True,
-        max_iterations=5,
-        return_intermediate_steps=True
-    )
-
-    return agent_executor
+    return agent
 
 
 # ============================================================================
@@ -203,48 +166,61 @@ def test_basic_agent():
     # Тестові запити що вимагають різних tools
     test_queries = [
         {
-            "input": "What's the weather in Kyiv?",
+            "query": "What's the weather in Kyiv?",
             "expected_tool": "get_weather"
         },
         {
-            "input": "Calculate 123 * 456",
+            "query": "Calculate 123 * 456",
             "expected_tool": "calculate"
         },
         {
-            "input": "What is LangChain and how do I create agents?",
+            "query": "What is LangChain and how do I create agents?",
             "expected_tool": "search_docs"
         },
         {
-            "input": "What's the weather in Tokyo and what's 50 + 50?",
+            "query": "What's the weather in Tokyo and what's 50 + 50?",
             "expected_tool": "multiple"
         }
     ]
 
     for i, query_data in enumerate(test_queries, 1):
         print("\n" + "=" * 70)
-        print(f"TEST {i}: {query_data['input']}")
+        print(f"TEST {i}: {query_data['query']}")
         print(f"Expected tool(s): {query_data['expected_tool']}")
         print("=" * 70 + "\n")
 
         try:
-            result = agent.invoke({"input": query_data["input"]})
+            # LangChain 1.0 API: invoke приймає messages
+            result = agent.invoke({
+                "messages": [{"role": "user", "content": query_data["query"]}]
+            })
 
             print("\n" + "-" * 70)
             print("RESULT:")
             print("-" * 70)
-            print(f"Output: {result['output']}\n")
 
-            # Show which tools were used
-            if result.get('intermediate_steps'):
-                print("Tools used:")
-                for step in result['intermediate_steps']:
-                    action, observation = step
-                    print(f"  → {action.tool}: {action.tool_input}")
+            # Результат може бути в різних форматах залежно від версії
+            if isinstance(result, dict):
+                if "messages" in result:
+                    # Витягуємо останнє повідомлення
+                    last_message = result["messages"][-1]
+                    if hasattr(last_message, "content"):
+                        print(f"Output: {last_message.content}\n")
+                    else:
+                        print(f"Output: {last_message}\n")
+                elif "output" in result:
+                    print(f"Output: {result['output']}\n")
+                else:
+                    print(f"Output: {result}\n")
+            else:
+                print(f"Output: {result}\n")
 
         except Exception as e:
-            print(f"\n❌ Error: {e}\n")
+            print(f"\nERROR: Error: {e}\n")
+            import traceback
+            traceback.print_exc()
 
-        input("\n⏸️  Press Enter to continue to next test...\n")
+        input("\nPAUSE  Press Enter to continue to next test...\n")
 
 
 # ============================================================================
@@ -253,21 +229,22 @@ def test_basic_agent():
 
 if __name__ == "__main__":
     print("\n")
-    print("🎯 LangChain 1.0 - Basic Agent with LangSmith Tracing")
+    print("TARGET LangChain 1.0 - Basic Agent with LangSmith Tracing")
     print("=" * 70)
     print()
     print("Features:")
-    print("  ✅ create_react_agent - Modern v1.0 API")
-    print("  ✅ Multiple tools (weather, calculator, docs)")
-    print("  ✅ ReAct prompting pattern")
-    print("  ✅ LangSmith automatic tracing")
-    print("  ✅ Error handling and max iterations")
+    print("  OK create_agent - LangChain 1.0 API (October 2025)")
+    print("  OK Model as string parameter (not ChatOpenAI object)")
+    print("  OK Multiple tools (weather, calculator, docs)")
+    print("  OK Automatic optimal prompting")
+    print("  OK LangSmith automatic tracing")
+    print("  OK Direct agent invocation (no AgentExecutor)")
     print()
     print("=" * 70 + "\n")
 
     # Перевірка API ключів
     if not os.getenv("OPENAI_API_KEY"):
-        print("❌ ERROR: OPENAI_API_KEY not found in environment!")
+        print("ERROR: ERROR: OPENAI_API_KEY not found in environment!")
         print("Please set it in .env file")
         exit(1)
 
@@ -275,14 +252,14 @@ if __name__ == "__main__":
         test_basic_agent()
 
         print("\n" + "=" * 70)
-        print("✅ ALL TESTS COMPLETED")
+        print("OK ALL TESTS COMPLETED")
         print("=" * 70)
-        print("\n💡 Check LangSmith dashboard to see traces:")
+        print("\nTIP: Check LangSmith dashboard to see traces:")
         print("   https://smith.langchain.com/\n")
 
     except KeyboardInterrupt:
         print("\n\n⏹️  Tests interrupted by user")
     except Exception as e:
-        print(f"\n\n❌ Error: {e}")
+        print(f"\n\nERROR: Error: {e}")
         import traceback
         traceback.print_exc()

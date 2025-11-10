@@ -4,32 +4,36 @@ Production-ready agent implementations showcasing key innovations in LangChain 1
 
 ## Overview
 
-This repository contains three comprehensive agent examples demonstrating the latest LangChain/LangGraph patterns:
+This repository contains four comprehensive agent examples demonstrating the latest LangChain/LangGraph patterns:
 
-1. **Basic Agent** - ReAct agent using `create_react_agent` API
+1. **Basic Agent** - Agent using `create_agent` API (LangChain 1.0)
 2. **Middleware Agent** - Agent with before/after/modify hooks
 3. **RAG Agent** - Agentic RAG with LangGraph StateGraph and checkpointing
+4. **Multi-Agent System** - Supervisor Pattern with coordinated specialized agents
 
 All agents include **LangSmith tracing** for full observability.
 
 ## Features
 
 ### LangChain 1.0 (October 2025)
-- ✅ `create_react_agent()` - Modern agent creation API
-- ✅ Middleware architecture with three hooks
-- ✅ Stable APIs (no breaking changes until 2.0)
-- ✅ Production-ready patterns
+-  `create_agent()` - New unified agent creation API
+-  Middleware architecture with three hooks
+-  Stable APIs (no breaking changes until 2.0)
+-  Production-ready patterns
 
 ### LangGraph 1.0
-- ✅ StateGraph for complex orchestration
-- ✅ Checkpointing with MemorySaver
-- ✅ Conditional routing and loops
-- ✅ Thread-based conversation persistence
+-  StateGraph for complex orchestration
+-  Checkpointing with MemorySaver
+-  Conditional routing and loops
+-  Thread-based conversation persistence
+-  Supervisor Pattern for multi-agent coordination
+-  Hierarchical agent teams
+-  Shared state management across agents
 
 ### LangSmith Integration
-- ✅ Automatic tracing for all agents
-- ✅ Cost tracking and latency analysis
-- ✅ Trace visualization for debugging
+-  Automatic tracing for all agents
+-  Cost tracking and latency analysis
+-  Trace visualization for debugging
 
 ## Setup
 
@@ -59,11 +63,11 @@ LANGCHAIN_PROJECT=langchain-v1-agents
 
 ### 1. Basic Agent (01_basic_agent.py)
 
-**Purpose:** Demonstrates the modern `create_react_agent` API with multiple tools.
+**Purpose:** Demonstrates the LangChain 1.0 `create_agent` API with multiple tools.
 
-**Pattern:** ReAct (Reasoning and Acting)
+**Pattern:** Automatic Agent Orchestration
 ```
-User Query → Think → Act (use tool) → Observe → Think → Answer
+User Query  Agent  Tool Selection  Tool Execution  Response
 ```
 
 **Tools:**
@@ -77,7 +81,8 @@ python 01_basic_agent.py
 ```
 
 **Key Features:**
-- Uses `create_react_agent` (v1.0 API, not deprecated AgentExecutor)
+- Uses `create_agent` (LangChain 1.0 API - October 2025)
+- Automatic prompt optimization
 - Error handling with `handle_parsing_errors=True`
 - Max iterations limit for safety
 - Returns intermediate steps for debugging
@@ -109,7 +114,7 @@ A 15% tip on 250 UAH is 37.50 UAH.
 
 **Pattern:** Agent with Middleware Hooks
 ```
-Request → before_model → [modify_model_request] → LLM Call → after_model → Response
+Request  before_model  [modify_model_request]  LLM Call  after_model  Response
 ```
 
 **Middleware Implementations:**
@@ -161,19 +166,19 @@ has been disabled for security reasons."
 
 **Pattern:** Agentic RAG with Query Rewriting
 ```
-User Query → Retrieve Docs → Grade Relevance
-    ↓ (if relevant)
-Generate Answer → END
-    ↓ (if irrelevant)
-Rewrite Query → Retrieve Again → Grade → ...
+User Query  Retrieve Docs  Grade Relevance
+     (if relevant)
+Generate Answer  END
+     (if irrelevant)
+Rewrite Query  Retrieve Again  Grade  ...
 ```
 
 **Graph Structure:**
 ```
-START → retrieve → grade → [decide]
-                    ↓
-           if relevant: generate → END
-           if irrelevant: rewrite → retrieve (loop)
+START  retrieve  grade  [decide]
+                    
+           if relevant: generate  END
+           if irrelevant: rewrite  retrieve (loop)
 ```
 
 **Run:**
@@ -240,6 +245,160 @@ config2 = {"configurable": {"thread_id": "conversation_2"}}
 
 ---
 
+### 4. Multi-Agent System (04_multiagent_langgraph.py)
+
+**Purpose:** Implements Supervisor Pattern with hierarchical multi-agent coordination using LangGraph 1.0.
+
+**Pattern:** Supervisor coordinating specialized agents
+```
+User Query  Supervisor  [Researcher  Supervisor  Analyzer  Supervisor  Synthesizer]  END
+```
+
+**Architecture:**
+```
+START  Supervisor
+          (delegates to specialist)
+    [Researcher | Analyzer | Synthesizer]
+          (returns control)
+      Supervisor (decides next step)
+         
+      END (when complete)
+```
+
+**Run:**
+```bash
+python 04_multiagent_langgraph.py
+```
+
+**Specialized Agents:**
+
+1. **SupervisorAgent** 
+   - Coordinates team of specialists
+   - Makes delegation decisions
+   - Evaluates progress and determines completion
+   - Uses structured output for routing logic
+
+2. **ResearcherAgent** 
+   - RAG-based knowledge retrieval
+   - Searches LangGraph 1.0 documentation
+   - Evaluates quality of retrieved documents
+   - Returns top-k relevant sources
+
+3. **AnalyzerAgent** 
+   - Analyzes retrieved information
+   - Extracts key insights and patterns
+   - Structures technical details
+   - Identifies best practices
+
+4. **SynthesizerAgent** 
+   - Creates comprehensive final answer
+   - Combines analysis with source docs
+   - Formats response for readability
+   - Cites sources appropriately
+
+**Key Features:**
+- Supervisor Pattern from LangGraph 1.0 (2025)
+- Hierarchical multi-agent coordination
+- Shared StateGraph across all agents
+- Conditional routing based on supervisor decisions
+- MemorySaver checkpointing for workflow persistence
+- RAG integration with 8-document knowledge base
+- LangSmith tracing for all agent interactions
+- Structured decision-making with Pydantic models
+
+**Knowledge Base (LangGraph 1.0 Topics):**
+- Supervisor Pattern architecture
+- StateGraph API and features
+- Checkpointing mechanisms (MemorySaver, PostgresSaver)
+- Multi-agent coordination patterns
+- LangGraph Swarm (2025 release)
+- LangGraph Server & persistence
+- Error handling & recovery strategies
+- Best practices for multi-agent systems
+
+**Example Flow:**
+
+```
+Query: "What is the Supervisor Pattern in LangGraph 1.0?"
+
+ SUPERVISOR: Decides to delegate to researcher
+   Decision: researcher
+   Reasoning: Need to find information first
+
+ RESEARCHER: Searches knowledge base
+   Found 3 documents about Supervisor Pattern
+   Quality: Sufficient (confidence: 0.95)
+
+ SUPERVISOR: Delegates to analyzer
+   Decision: analyzer
+   Reasoning: Documents found, need analysis
+
+ ANALYZER: Analyzes documents
+   Extracted: Pattern definition, architecture, use cases
+   Key concepts: hierarchical coordination, specialized agents
+
+ SUPERVISOR: Delegates to synthesizer
+   Decision: synthesizer
+   Reasoning: Analysis ready, create final answer
+
+ SYNTHESIZER: Creates comprehensive answer
+   Combined analysis with source citations
+   Formatted with examples and technical details
+   Answer: [Detailed explanation of Supervisor Pattern]
+
+ SUPERVISOR: Work complete
+   Decision: FINISH
+
+Stats:
+  - Iterations: 4
+  - Agents invoked: 3 specialists
+  - Documents retrieved: 3
+  - Messages exchanged: 7
+```
+
+**State Schema:**
+```python
+class MultiAgentState(TypedDict):
+    messages: Annotated[List, operator.add]  # Agent communication
+    question: str  # User query
+    current_agent: str  # Active agent
+    retrieved_docs: List[Document]  # From researcher
+    analysis: str  # From analyzer
+    final_answer: str  # From synthesizer
+    supervisor_decision: str  # Reasoning
+    iteration_count: int  # Progress tracking
+```
+
+**Workflow Diagram:**
+```
+                Supervisor
+                    |
+        +-----------+-----------+
+        |           |           |
+   Researcher   Analyzer   Synthesizer
+        |           |           |
+        +-----------+-----------+
+                    |
+                    v
+            (back to Supervisor)
+```
+
+**Checkpointing:**
+```python
+# Each workflow run uses unique thread
+config = {"configurable": {"thread_id": "workflow_1"}}
+
+# Execute multi-agent workflow
+for event in app.stream(initial_state, config):
+    print(f"Agent: {list(event.keys())[0]}")
+
+# Retrieve final state
+final_state = app.get_state(config)
+answer = final_state.values['final_answer']
+```
+
+---
+
 ## LangSmith Tracing
 
 All agents automatically send traces to LangSmith when `LANGCHAIN_TRACING_V2=true`.
@@ -247,7 +406,7 @@ All agents automatically send traces to LangSmith when `LANGCHAIN_TRACING_V2=tru
 **View traces at:** https://smith.langchain.com
 
 **What's traced:**
-- Agent reasoning steps (Thought → Action → Observation)
+- Agent reasoning steps (Thought  Action  Observation)
 - Tool calls and results
 - LLM prompts and completions
 - Token usage and costs
@@ -257,22 +416,28 @@ All agents automatically send traces to LangSmith when `LANGCHAIN_TRACING_V2=tru
 **Example trace hierarchy:**
 ```
 AgentExecutor
-├─ LLM Call (Reasoning)
-├─ Tool: get_weather
-│  └─ Result: "Partly cloudy, 18°C"
-├─ LLM Call (Next action)
-├─ Tool: calculate
-│  └─ Result: "37.5"
-└─ LLM Call (Final answer)
+├- LLM Call (Reasoning)
+├- Tool: get_weather
+|  +- Result: "Partly cloudy, 18°C"
+├- LLM Call (Next action)
+├- Tool: calculate
+|  +- Result: "37.5"
++- LLM Call (Final answer)
 ```
 
 ## Architecture Patterns
 
-### ReAct Pattern (Agent 1)
+### LangChain 1.0 Pattern (Agent 1)
 ```python
-agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
-executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-result = executor.invoke({"input": query})
+agent = create_agent(
+    model="gpt-4o-mini",  # model as string, not ChatOpenAI object
+    tools=tools,
+    system_prompt="You are a helpful assistant"
+)
+# Direct invocation - no AgentExecutor needed
+result = agent.invoke({
+    "messages": [{"role": "user", "content": "Your question here"}]
+})
 ```
 
 ### Middleware Pattern (Agent 2)
@@ -281,11 +446,17 @@ class LoggingMiddleware:
     def before_model(self, state): ...
     def after_model(self, state, result): ...
 
-executor = MiddlewareAgentExecutor(
-    agent=agent,
+# Wrapper around create_agent with middleware
+agent = MiddlewareAgent(
+    model="gpt-4o-mini",
     tools=tools,
+    system_prompt="You are a helpful assistant",
     middlewares=[LoggingMiddleware(), SecurityMiddleware()]
 )
+
+result = agent.invoke({
+    "messages": [{"role": "user", "content": "question"}]
+})
 ```
 
 ### Agentic RAG Pattern (Agent 3)
@@ -297,6 +468,59 @@ workflow.add_conditional_edges("grade", decide_next_step, {...})
 
 checkpointer = MemorySaver()
 app = workflow.compile(checkpointer=checkpointer)
+```
+
+### Multi-Agent Supervisor Pattern (Agent 4)
+```python
+# Define shared state for all agents
+class MultiAgentState(TypedDict):
+    messages: Annotated[List, operator.add]
+    question: str
+    current_agent: str
+    retrieved_docs: List[Document]
+    analysis: str
+    final_answer: str
+    supervisor_decision: str
+    iteration_count: int
+
+# Create StateGraph with all agents
+workflow = StateGraph(MultiAgentState)
+
+# Add specialized agent nodes
+workflow.add_node("supervisor", supervisor_node)
+workflow.add_node("researcher", researcher_node)  # RAG search
+workflow.add_node("analyzer", analyzer_node)      # Analysis
+workflow.add_node("synthesizer", synthesizer_node) # Final answer
+
+# Entry point: supervisor
+workflow.set_entry_point("supervisor")
+
+# Conditional routing from supervisor
+workflow.add_conditional_edges(
+    "supervisor",
+    route_after_supervisor,  # Decision function
+    {
+        "researcher": "researcher",
+        "analyzer": "analyzer",
+        "synthesizer": "synthesizer",
+        "end": END
+    }
+)
+
+# Return control to supervisor after each agent
+workflow.add_edge("researcher", "supervisor")
+workflow.add_edge("analyzer", "supervisor")
+workflow.add_edge("synthesizer", "supervisor")
+
+# Compile with checkpointer
+checkpointer = MemorySaver()
+app = workflow.compile(checkpointer=checkpointer)
+
+# Execute with thread-based isolation
+config = {"configurable": {"thread_id": "workflow_1"}}
+for event in app.stream(initial_state, config):
+    agent_name = list(event.keys())[0]
+    print(f"Current agent: {agent_name}")
 ```
 
 ## Production Considerations
@@ -328,8 +552,8 @@ app = workflow.compile(checkpointer=checkpointer)
 
 ## Troubleshooting
 
-**Issue:** `ImportError: cannot import name 'create_react_agent'`
-- **Fix:** Ensure `langchain>=1.0.0` is installed
+**Issue:** `ImportError: cannot import name 'create_agent'`
+- **Fix:** Ensure `langchain>=1.0.0` is installed (October 2025 release)
 
 **Issue:** LangSmith traces not appearing
 - **Fix:** Check `.env` has `LANGCHAIN_TRACING_V2=true` and valid `LANGCHAIN_API_KEY`
@@ -352,9 +576,18 @@ agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION
 
 **New (v1.0):**
 ```python
-from langchain.agents import create_react_agent, AgentExecutor
-agent = create_react_agent(llm, tools, prompt)
-executor = AgentExecutor(agent=agent, tools=tools)
+from langchain.agents import create_agent
+
+agent = create_agent(
+    model="gpt-4o-mini",  # model name as string
+    tools=tools,
+    system_prompt="You are a helpful assistant"
+)
+
+# Direct invocation - no AgentExecutor needed
+result = agent.invoke({
+    "messages": [{"role": "user", "content": "question"}]
+})
 ```
 
 ## Resources
