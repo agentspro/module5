@@ -13,7 +13,7 @@ Tools enable agents to:
 - Perform calculations
 - Access external APIs
 
-CrewAI Version: 0.98.0+
+CrewAI Version: 1.4.0+
 Python: 3.10-3.13
 """
 
@@ -25,7 +25,6 @@ from crewai_tools import (
     DirectoryReadTool,
 )
 from langchain.tools import Tool
-from langchain_community.utilities import SerpAPIWrapper
 from typing import Dict, Any
 import json
 
@@ -141,14 +140,19 @@ def create_research_crew():
         Crew: Research crew with tools
     """
 
-    # Web search tool (requires SERPAPI_API_KEY if enabled)
-    # Uncomment if you have SerpAPI access
-    # search = SerpAPIWrapper()
-    # search_tool = Tool(
-    #     name="WebSearch",
-    #     func=search.run,
-    #     description="Search the web for current information"
-    # )
+    # Web search tool using Tavily (REAL API)
+    from langchain_community.tools.tavily_search import TavilySearchResults
+
+    tavily_api_key = os.getenv("TAVILY_API_KEY")
+    if not tavily_api_key:
+        print("WARNING: TAVILY_API_KEY not found. Web search will not be available.")
+        print("Get free API key at: https://tavily.com\n")
+        search_tool = None
+    else:
+        search_tool = TavilySearchResults(
+            max_results=5,
+            api_key=tavily_api_key
+        )
 
     # Define agents with specific tools
     researcher = Agent(
@@ -163,8 +167,7 @@ def create_research_crew():
         tools=[
             file_read_tool,
             directory_read_tool,
-            # search_tool  # Uncomment if SerpAPI available
-        ],
+        ] + ([search_tool] if search_tool else []),
         verbose=True,
         allow_delegation=False,
         llm="gpt-4o-mini"
@@ -302,26 +305,14 @@ def main():
     print("=" * 80)
     print()
 
-    # Create sample data file for demonstration
-    sample_data = {
-        "framework_comparison": [
-            {"name": "LangChain", "agents": 1, "complexity": "medium"},
-            {"name": "LangGraph", "agents": 4, "complexity": "high"},
-            {"name": "CrewAI", "agents": 5, "complexity": "low"}
-        ],
-        "metrics": {
-            "total_lines": 3500,
-            "average_response_time": 1.2,
-            "success_rate": 0.95
-        }
-    }
-
-    # Write sample data
-    os.makedirs("/tmp/research_data", exist_ok=True)
-    with open("/tmp/research_data/framework_data.json", "w") as f:
-        json.dump(sample_data, f, indent=2)
-
-    print("Created sample data at /tmp/research_data/framework_data.json")
+    # NOTE: This crew uses REAL tools:
+    # - Web search via Tavily API for current information
+    # - File reading/directory tools for local data
+    # - Data analysis and calculation tools
+    print("Using REAL APIs (no sample/mock data):")
+    print("  - Tavily Search for web research")
+    print("  - File I/O tools for document analysis")
+    print("  - Data analysis tools for metrics")
     print()
 
     # Create the crew

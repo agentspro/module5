@@ -1,5 +1,5 @@
-crewai>=0.98.0,<1.0.0
-crewai-tools>=0.12.0
+crewai>=1.4.0,<2.0.0
+crewai-tools>=0.38.0
 langchain>=0.3.0
 langchain-openai>=0.2.0
 langchain-community>=0.3.0
@@ -7,3 +7,9 @@ openai>=1.50.0
 pydantic>=2.0.0,<3.0.0
 python-dotenv>=1.0.0
 langmem>=0.1.0
+
+# Real API integrations
+requests>=2.31.0
+numexpr>=2.8.0
+tavily-python>=0.3.0
+yfinance>=0.2.0

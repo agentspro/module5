@@ -7,7 +7,7 @@ This example demonstrates the fundamental concepts of CrewAI:
 - Organizing them into a Crew with sequential process
 - Using crew.kickoff() to execute the workflow
 
-CrewAI Version: 0.98.0+
+CrewAI Version: 1.4.0+
 Python: 3.10-3.13
 """
 
