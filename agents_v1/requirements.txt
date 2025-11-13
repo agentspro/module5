@@ -1,8 +1,8 @@
-# LangChain 1.0 - Core libraries (October 2025 release)
+# LangChain 1.0 - Core libraries
 langchain>=1.0.0,<2.0.0
 langchain-core>=1.0.0,<2.0.0
-langchain-openai>=0.2.0
-langchain-community>=0.3.0
+langchain-openai>=1.0.0
+langchain-community>=0.4.0
 
 # LangGraph 1.0 - State graph orchestration
 langgraph>=1.0.0,<2.0.0

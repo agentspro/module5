@@ -1,6 +1,8 @@
 """
-БАЗОВИЙ АГЕНТ - LangChain 1.0 API з реальними інструментами
-На базі офіційної документації: create_agent з LangChain 1.0
+БАЗОВИЙ АГЕНТ - LangChain 1.0 з реальними інструментами
+На базі офіційної документації: create_react_agent
+
+ВАЖЛИВО: Потребує langchain>=1.0.0 (див. requirements.txt)
 
 LangSmith Integration: Автоматично ввімкнений через environment variables
 
@@ -12,11 +14,13 @@ LangSmith Integration: Автоматично ввімкнений через en
 
 import os
 import requests
-from langchain_core.tools import tool
-from langchain.agents import create_agent
+from langchain.tools import tool  # Офіційний імпорт згідно LangChain docs
 from langchain_community.tools.tavily_search import TavilySearchResults
 from dotenv import load_dotenv
 import numexpr as ne
+
+# LangChain 1.0 API
+from langchain.agents import create_agent
 
 load_dotenv()
 
@@ -171,14 +175,10 @@ def create_basic_agent():
     """
     Створює базового агента з LangChain 1.0 API та реальними інструментами
 
-    В LangChain 1.0:
-    - create_agent приймає model (string), tools (list), system_prompt (string)
-    - Автоматично створює оптимальний промпт
-    - Повертає agent який можна викликати через .invoke()
-    - Не потрібен AgentExecutor
+    Використовує create_agent (LangChain 1.0+)
     """
     print("=" * 70)
-    print("AGENT БАЗОВИЙ АГЕНТ - LangChain 1.0 (РЕАЛЬНІ ІНСТРУМЕНТИ)")
+    print("🤖 БАЗОВИЙ АГЕНТ - LangChain 1.0 (РЕАЛЬНІ ІНСТРУМЕНТИ)")
     print("=" * 70 + "\n")
 
     # 1. Список реальних tools
@@ -189,7 +189,9 @@ def create_basic_agent():
         print(f"  • {tool_item.name}: {tool_item.description[:60]}...")
     print()
 
-    # 2. Створення агента (LangChain 1.0 API)
+    # 2. Створення агента з LangChain 1.0 API
+    print("✅ Using LangChain 1.0+ create_agent API\n")
+
     agent = create_agent(
         model="gpt-4o-mini",
         tools=tools,
@@ -243,29 +245,22 @@ def test_basic_agent():
         print("=" * 70 + "\n")
 
         try:
-            # LangChain 1.0 API: invoke приймає messages
+            # LangChain 1.0 create_agent invoke format
             result = agent.invoke({
                 "messages": [{"role": "user", "content": query_data["query"]}]
             })
 
-            print("\n" + "-" * 70)
-            print("RESULT:")
-            print("-" * 70)
-
-            # Результат може бути в різних форматах
-            if isinstance(result, dict):
-                if "messages" in result:
-                    last_message = result["messages"][-1]
-                    if hasattr(last_message, "content"):
-                        print(f"Output: {last_message.content}\n")
-                    else:
-                        print(f"Output: {last_message}\n")
-                elif "output" in result:
-                    print(f"Output: {result['output']}\n")
-                else:
-                    print(f"Output: {result}\n")
+            # Extract output from messages
+            if isinstance(result, dict) and "messages" in result:
+                last_message = result["messages"][-1]
+                output = last_message.content if hasattr(last_message, "content") else str(last_message)
             else:
-                print(f"Output: {result}\n")
+                output = str(result)
+
+            print("\n" + "-" * 70)
+            print("✅ RESULT:")
+            print("-" * 70)
+            print(f"Output: {output}\n")
 
         except Exception as e:
             print(f"\nERROR: Error: {e}\n")

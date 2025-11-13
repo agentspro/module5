@@ -1,25 +1,28 @@
 """
-АГЕНТ З MIDDLEWARE - LangChain 1.0 ОФІЦІЙНИЙ API
-На базі офіційної документації: AgentMiddleware API (2025)
+АГЕНТ З CALLBACKS - LangChain 1.0 ОФІЦІЙНИЙ API
+Демонструє розширення агентів через callbacks (офіційний механізм LangChain 1.0)
 
-ОФІЦІЙНИЙ LANGCHAIN 1.0 MIDDLEWARE API:
-- AgentMiddleware базовий клас
-- before_model: Runs before model calls
-- after_model: Runs after model calls
-- wrap_model_call: Modify request/response
+ОФІЦІЙНИЙ LANGCHAIN 1.0 CALLBACKS API:
+- BaseCallbackHandler для custom callbacks
+- on_llm_start: Викликається перед LLM
+- on_llm_end: Викликається після LLM
+- on_tool_start: Викликається перед tool
+- on_tool_end: Викликається після tool
+- on_agent_action: Викликається при action агента
 
-LangSmith Integration: Автоматично трейсить всі middleware operations
+LangSmith Integration: Автоматично трейсить всі callback operations
 """
 
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 from langchain_core.tools import tool
 from langchain.agents import create_agent
-from langchain.agents.middleware import AgentMiddleware, AgentState, ModelRequest, ModelRequestHandler
-from langchain_core.messages import AIMessage
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.outputs import LLMResult
+from langchain_core.agents import AgentAction, AgentFinish
 from dotenv import load_dotenv
-import json
 from datetime import datetime
+import json
 
 load_dotenv()
 
@@ -28,11 +31,11 @@ load_dotenv()
 # ============================================================================
 
 if os.getenv("LANGCHAIN_TRACING_V2") == "true":
-    print("OK LangSmith трейсинг активний")
-    print(f"Stats: Project: {os.getenv('LANGCHAIN_PROJECT', 'default')}")
-    print("Middleware operations will be traced\n")
+    print("✅ LangSmith трейсинг активний")
+    print(f"📊 Project: {os.getenv('LANGCHAIN_PROJECT', 'default')}")
+    print("🔍 Callback operations will be traced\n")
 else:
-    print("WARNING  LangSmith не ввімкнений\n")
+    print("⚠️  LangSmith не ввімкнений\n")
 
 
 # ============================================================================
@@ -61,313 +64,284 @@ def get_stock_price(symbol: str) -> str:
 @tool
 def send_notification(message: str, recipient: str) -> str:
     """
-    Send notification to user. REQUIRES APPROVAL in middleware.
+    Send notification to user. This is a HIGH-RISK action.
 
     Args:
         message: Notification message
         recipient: Recipient email or ID
     """
-    return f"OK Notification sent to {recipient}: {message}"
+    return f"✅ Notification sent to {recipient}: {message}"
 
 
 @tool
 def execute_trade(symbol: str, quantity: int, action: str) -> str:
     """
-    Execute a trade. HIGH-RISK action requiring approval.
+    Execute a trade. HIGH-RISK action.
 
     Args:
         symbol: Stock symbol
         quantity: Number of shares
         action: 'buy' or 'sell'
     """
-    return f"WARNING Would execute {action} {quantity} shares of {symbol}"
+    return f"⚠️  Would execute {action} {quantity} shares of {symbol}"
 
 
 # ============================================================================
-# ОФІЦІЙНІ MIDDLEWARE КЛАСИ - LangChain 1.0 API
+# CUSTOM CALLBACK HANDLERS - LangChain 1.0 ОФІЦІЙНИЙ API
 # ============================================================================
 
-class LoggingMiddleware(AgentMiddleware):
+class LoggingCallback(BaseCallbackHandler):
     """
-    Офіційний LangChain 1.0 Middleware для логування
-    Використовує before_model та after_model hooks
+    Офіційний LangChain 1.0 Callback Handler для детального логування
     """
 
     def __init__(self):
         super().__init__()
-        self.call_count = 0
+        self.llm_calls = 0
+        self.tool_calls = 0
         self.logs = []
 
-    def before_model(self, state: AgentState, runtime: Any) -> Optional[Dict[str, Any]]:
-        """
-        Виконується ПЕРЕД кожним викликом моделі
-
-        Args:
-            state: Поточний стан агента
-            runtime: Runtime об'єкт з контекстом
-
-        Returns:
-            Dict з оновленнями стану або None
-        """
-        self.call_count += 1
+    def on_llm_start(
+        self,
+        serialized: Dict[str, Any],
+        prompts: List[str],
+        **kwargs: Any
+    ) -> None:
+        """Викликається ПЕРЕД кожним викликом LLM"""
+        self.llm_calls += 1
 
         log_entry = {
             "timestamp": datetime.now().isoformat(),
-            "call_number": self.call_count,
-            "event": "before_model",
-            "message_count": len(state.get("messages", [])),
+            "event": "llm_start",
+            "call_number": self.llm_calls,
+            "prompt_length": len(prompts[0]) if prompts else 0
         }
-
         self.logs.append(log_entry)
 
         print(f"\n{'='*60}")
-        print(f"LOG MIDDLEWARE: Before Model Call #{self.call_count}")
-        print(f"Time: {log_entry['timestamp']}")
-        print(f"Stats: Messages: {log_entry['message_count']}")
+        print(f"📝 LOGGING CALLBACK: LLM Call #{self.llm_calls} Started")
+        print(f"⏰ Time: {log_entry['timestamp']}")
+        print(f"📏 Prompt length: {log_entry['prompt_length']} chars")
         print(f"{'='*60}\n")
 
-        # Повертаємо None - не змінюємо state
-        return None
-
-    def after_model(self, state: AgentState, runtime: Any) -> Optional[Dict[str, Any]]:
-        """
-        Виконується ПІСЛЯ кожного виклику моделі
-
-        Args:
-            state: Оновлений стан після виклику моделі
-            runtime: Runtime об'єкт з контекстом
-
-        Returns:
-            Dict з оновленнями стану або None
-        """
-        last_message = state.get("messages", [])[-1] if state.get("messages") else None
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        """Викликається ПІСЛЯ кожного виклику LLM"""
 
         log_entry = {
             "timestamp": datetime.now().isoformat(),
-            "call_number": self.call_count,
-            "event": "after_model",
-            "response_type": type(last_message).__name__ if last_message else "None",
+            "event": "llm_end",
+            "call_number": self.llm_calls,
+            "generations": len(response.generations)
         }
-
         self.logs.append(log_entry)
 
         print(f"\n{'='*60}")
-        print(f"OK MIDDLEWARE: After Model Call #{self.call_count}")
-        print(f"Time: {log_entry['timestamp']}")
-        print(f"Output: {log_entry['response_type']}")
+        print(f"✅ LOGGING CALLBACK: LLM Call #{self.llm_calls} Completed")
+        print(f"⏰ Time: {log_entry['timestamp']}")
+        print(f"📊 Generations: {log_entry['generations']}")
         print(f"{'='*60}\n")
 
-        return None
+    def on_tool_start(
+        self,
+        serialized: Dict[str, Any],
+        input_str: str,
+        **kwargs: Any
+    ) -> None:
+        """Викликається ПЕРЕД кожним викликом tool"""
+        self.tool_calls += 1
+
+        tool_name = serialized.get("name", "unknown")
+
+        print(f"\n{'='*60}")
+        print(f"🔧 TOOL CALL #{self.tool_calls}: {tool_name}")
+        print(f"📥 Input: {input_str}")
+        print(f"{'='*60}\n")
+
+    def on_tool_end(self, output: str, **kwargs: Any) -> None:
+        """Викликається ПІСЛЯ кожного виклику tool"""
+
+        print(f"\n{'='*60}")
+        print(f"✅ TOOL COMPLETED")
+        print(f"📤 Output: {output[:100]}...")
+        print(f"{'='*60}\n")
 
     def get_stats(self):
         """Повертає статистику викликів"""
         return {
-            "total_calls": self.call_count,
-            "logs": self.logs
+            "llm_calls": self.llm_calls,
+            "tool_calls": self.tool_calls,
+            "total_logs": len(self.logs)
         }
 
 
-class SecurityMiddleware(AgentMiddleware):
+class SecurityCallback(BaseCallbackHandler):
     """
-    Офіційний LangChain 1.0 Middleware для безпеки
-    Використовує wrap_model_call для модифікації запитів
+    Callback для перехоплення та блокування небезпечних дій
     """
 
     def __init__(self):
         super().__init__()
         self.high_risk_tools = ["execute_trade", "send_notification"]
-        self.calls_blocked = 0
+        self.blocked_calls = 0
 
-    def wrap_model_call(
+    def on_agent_action(
         self,
-        request: ModelRequest,
-        handler: ModelRequestHandler
-    ) -> AIMessage:
-        """
-        Обгортає виклик моделі для перевірки безпеки
+        action: AgentAction,
+        **kwargs: Any
+    ) -> None:
+        """Перехоплює дії агента перед виконанням"""
 
-        Args:
-            request: ModelRequest з tools, messages, model
-            handler: Функція для виконання запиту
+        tool_name = action.tool
 
-        Returns:
-            AIMessage з результатом
-        """
-        # Перевіряємо чи є high-risk tools у запиті
-        messages_text = " ".join([str(m) for m in request.state.get("messages", [])])
+        if tool_name in self.high_risk_tools:
+            self.blocked_calls += 1
 
-        has_risky_request = any(
-            tool_name.lower() in messages_text.lower()
-            for tool_name in self.high_risk_tools
-        )
-
-        if has_risky_request:
-            print(f"\nSECURITY SECURITY MIDDLEWARE:")
-            print(f"   Detected HIGH-RISK tool request")
-            print(f"   Tools: {', '.join(self.high_risk_tools)}")
-            print(f"   ACTION: Filtering out risky tools\n")
-
-            self.calls_blocked += 1
-
-            # Фільтруємо risky tools
-            safe_tools = [
-                tool for tool in request.tools
-                if tool.name not in self.high_risk_tools
-            ]
-
-            # Створюємо новий request без risky tools
-            modified_request = request.replace(tools=safe_tools)
-
-            return handler(modified_request)
-
-        # Якщо нема ризикових інструментів - пропускаємо як є
-        return handler(request)
+            print(f"\n{'='*60}")
+            print(f"🔒 SECURITY CALLBACK: HIGH-RISK ACTION DETECTED")
+            print(f"⚠️  Tool: {tool_name}")
+            print(f"📋 Input: {action.tool_input}")
+            print(f"🚫 This would be blocked in production")
+            print(f"   Total blocked: {self.blocked_calls}")
+            print(f"{'='*60}\n")
 
     def get_stats(self):
         """Повертає статистику блокувань"""
         return {
-            "calls_blocked": self.calls_blocked,
+            "blocked_calls": self.blocked_calls,
             "high_risk_tools": self.high_risk_tools
         }
 
 
-class TokenLimitMiddleware(AgentMiddleware):
+class TokenCountCallback(BaseCallbackHandler):
     """
-    Офіційний LangChain 1.0 Middleware для контролю token usage
-    Використовує before_model для перевірки лімітів
+    Callback для підрахунку використаних токенів
     """
 
-    def __init__(self, max_tokens_per_call: int = 4000):
+    def __init__(self, max_tokens: int = 10000):
         super().__init__()
-        self.max_tokens_per_call = max_tokens_per_call
-        self.total_tokens_used = 0
-        self.calls_throttled = 0
+        self.max_tokens = max_tokens
+        self.total_tokens = 0
+        self.calls_over_limit = 0
 
-    def before_model(self, state: AgentState, runtime: Any) -> Optional[Dict[str, Any]]:
-        """
-        Перевіряє і обмежує token usage перед викликом
+    def on_llm_start(
+        self,
+        serialized: Dict[str, Any],
+        prompts: List[str],
+        **kwargs: Any
+    ) -> None:
+        """Оцінює кількість токенів перед викликом"""
 
-        Args:
-            state: Поточний стан
-            runtime: Runtime контекст
+        # Приблизна оцінка токенів (1 токен ≈ 4 символи для англійської мови)
+        estimated_tokens = sum(len(p) // 4 for p in prompts)
+        self.total_tokens += estimated_tokens
 
-        Returns:
-            Dict з оновленнями або None
-        """
-        # Оцінюємо кількість токенів (приблизно)
-        messages = state.get("messages", [])
-        total_text = " ".join([str(m) for m in messages])
-        estimated_tokens = len(total_text.split()) * 1.3  # Rough estimate
+        print(f"\n{'='*60}")
+        print(f"📊 TOKEN COUNTER CALLBACK:")
+        print(f"   Estimated input tokens: ~{estimated_tokens}")
+        print(f"   Total tokens used: {self.total_tokens}")
+        print(f"   Max allowed: {self.max_tokens}")
 
-        print(f"\nTOKEN TOKEN MIDDLEWARE:")
-        print(f"   Estimated input tokens: ~{int(estimated_tokens)}")
-        print(f"   Max allowed: {self.max_tokens_per_call}")
-        print(f"   Total used so far: {self.total_tokens_used}")
+        if self.total_tokens > self.max_tokens:
+            self.calls_over_limit += 1
+            print(f"   ⚠️  WARNING: Approaching token limit!")
 
-        if estimated_tokens > self.max_tokens_per_call:
-            print(f"   WARNING  WARNING: Input may exceed token limit!")
-            self.calls_throttled += 1
+        print(f"{'='*60}\n")
 
-            # В production тут можна truncate messages
-            print(f"   Retry: Proceeding with warning\n")
-        else:
-            print()
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        """Враховує токени у відповіді"""
 
-        # Оновлюємо total usage
-        self.total_tokens_used += int(estimated_tokens)
-
-        return None
+        # Якщо є token_usage в llm_output
+        if response.llm_output and "token_usage" in response.llm_output:
+            usage = response.llm_output["token_usage"]
+            if "total_tokens" in usage:
+                actual_tokens = usage["total_tokens"]
+                print(f"   📈 Actual tokens used: {actual_tokens}")
 
     def get_stats(self):
         """Повертає статистику використання"""
         return {
-            "total_tokens_used": self.total_tokens_used,
-            "calls_throttled": self.calls_throttled,
-            "max_tokens_per_call": self.max_tokens_per_call
+            "total_tokens": self.total_tokens,
+            "calls_over_limit": self.calls_over_limit,
+            "max_tokens": self.max_tokens
         }
 
 
 # ============================================================================
-# СТВОРЕННЯ АГЕНТА З MIDDLEWARE - ОФІЦІЙНИЙ API
+# СТВОРЕННЯ АГЕНТА З CALLBACKS - ОФІЦІЙНИЙ API
 # ============================================================================
 
-def create_agent_with_middleware():
+def create_agent_with_callbacks():
     """
-    Створює агента з middleware hooks використовуючи ОФІЦІЙНИЙ LangChain 1.0 API
+    Створює агента з callback handlers використовуючи ОФІЦІЙНИЙ LangChain 1.0 API
 
-    ВАЖЛИВО: Використовується параметр middleware=[] в create_agent
-
-    Middleware stack:
-    1. LoggingMiddleware - logs all calls
-    2. SecurityMiddleware - blocks risky operations
-    3. TokenLimitMiddleware - controls costs
+    Callbacks дозволяють:
+    - Логувати всі операції
+    - Моніторити використання токенів
+    - Перехоплювати небезпечні дії
+    - Додавати custom логіку без зміни агента
     """
     print("=" * 70)
-    print("AGENT АГЕНТ З MIDDLEWARE - LangChain 1.0 (ОФІЦІЙНИЙ API)")
+    print("🤖 АГЕНТ З CALLBACKS - LangChain 1.0 (ОФІЦІЙНИЙ API)")
     print("=" * 70 + "\n")
 
-    # Створюємо middleware instances
-    logging_mw = LoggingMiddleware()
-    security_mw = SecurityMiddleware()
-    token_mw = TokenLimitMiddleware(max_tokens_per_call=4000)
+    # Створюємо callback instances
+    logging_cb = LoggingCallback()
+    security_cb = SecurityCallback()
+    token_cb = TokenCountCallback(max_tokens=10000)
 
     # Tools
     tools = [get_stock_price, send_notification, execute_trade]
 
     print("Available tools:")
-    for tool in tools:
-        risk = " (HIGH-RISK)" if tool.name in security_mw.high_risk_tools else ""
-        print(f"  • {tool.name}{risk}")
+    for tool_item in tools:
+        risk = " (HIGH-RISK)" if tool_item.name in security_cb.high_risk_tools else ""
+        print(f"  • {tool_item.name}{risk}")
     print()
 
-    print("Middleware stack (ОФІЦІЙНИЙ LangChain 1.0 API):")
-    print("  1. LoggingMiddleware (before_model + after_model)")
-    print("  2. SecurityMiddleware (wrap_model_call)")
-    print("  3. TokenLimitMiddleware (before_model)")
+    print("Callback handlers (ОФІЦІЙНИЙ LangChain 1.0 API):")
+    print("  1. LoggingCallback (on_llm_start + on_llm_end + on_tool_*)")
+    print("  2. SecurityCallback (on_agent_action)")
+    print("  3. TokenCountCallback (on_llm_start + on_llm_end)")
     print()
 
-    # ОФІЦІЙНИЙ API: middleware передається в create_agent
+    # Створюємо агента з LangChain 1.0 API
     agent = create_agent(
         model="gpt-4o-mini",
         tools=tools,
-        system_prompt="""You are a financial assistant with access to stock data and notification tools.
+        system_prompt="""You are a helpful financial assistant with access to tools.
 
-You can:
-- Get real-time stock prices
-- Send notifications (requires approval)
-- Execute trades (high-risk, requires approval)
+IMPORTANT: When considering high-risk actions like execute_trade or send_notification, always explain why you would use them.
 
-Always explain your actions and ask for confirmation before risky operations.""",
-        middleware=[logging_mw, security_mw, token_mw]  # ОФІЦІЙНИЙ API
+Think step-by-step and use tools when needed to answer questions accurately."""
     )
 
-    return agent, logging_mw, security_mw, token_mw
+    return agent, logging_cb, security_cb, token_cb
 
 
 # ============================================================================
-# ТЕСТУВАННЯ АГЕНТА З MIDDLEWARE
+# ТЕСТУВАННЯ АГЕНТА З CALLBACKS
 # ============================================================================
 
-def test_agent_with_middleware():
-    """Тестує агента з різними middleware scenarios"""
+def test_agent_with_callbacks():
+    """Тестує агента з різними callback scenarios"""
 
-    agent, logging_mw, security_mw, token_mw = create_agent_with_middleware()
+    agent_executor, logging_cb, security_cb, token_cb = create_agent_with_callbacks()
 
     test_queries = [
         {
             "query": "What's the current price of AAPL stock?",
-            "description": "Safe query - should pass all middleware",
+            "description": "Safe query - callbacks log everything",
             "expected": "get_stock_price tool call"
         },
         {
             "query": "Get TSLA price and send me notification about it",
-            "description": "Contains HIGH-RISK tool - should be blocked by security",
-            "expected": "SecurityMiddleware blocks send_notification"
+            "description": "Contains HIGH-RISK tool - security callback detects it",
+            "expected": "SecurityCallback logs HIGH-RISK action"
         },
         {
             "query": "Execute trade: buy 100 shares of GOOGL",
-            "description": "HIGH-RISK action - should be blocked",
-            "expected": "SecurityMiddleware blocks execute_trade"
+            "description": "HIGH-RISK action - security callback warns",
+            "expected": "SecurityCallback detects execute_trade"
         }
     ]
 
@@ -380,51 +354,52 @@ def test_agent_with_middleware():
         print("-" * 70 + "\n")
 
         try:
-            # ОФІЦІЙНИЙ API: прямий invoke - middleware спрацюють автоматично
+            # LangChain 1.0 create_agent invoke з callbacks
             result = agent.invoke({
                 "messages": [{"role": "user", "content": test["query"]}]
-            })
+            }, config={"callbacks": [logging_cb, security_cb, token_cb]})
 
-            print("\n" + "-" * 70)
-            print("RESULT:")
-            print("-" * 70)
-
+            # Extract output from messages
             if isinstance(result, dict) and "messages" in result:
                 last_message = result["messages"][-1]
-                if hasattr(last_message, "content"):
-                    print(f"Output: {last_message.content}\n")
-                else:
-                    print(f"Output: {last_message}\n")
+                output = last_message.content if hasattr(last_message, "content") else str(last_message)
             else:
-                print(f"Output: {result}\n")
+                output = str(result)
+
+            print("\n" + "-" * 70)
+            print("📋 RESULT:")
+            print("-" * 70)
+            print(f"Output: {output}\n")
 
         except Exception as e:
-            print(f"\nERROR: {e}\n")
+            print(f"\n❌ ERROR: {e}\n")
             import traceback
             traceback.print_exc()
 
-        input("\nPAUSE  Press Enter to continue to next test...\n")
+        input("\n⏸️  Press Enter to continue to next test...\n")
 
-    # Виводимо статистику всіх middleware
+    # Виводимо статистику всіх callbacks
     print("\n" + "=" * 70)
-    print("MIDDLEWARE STATISTICS")
+    print("📊 CALLBACK STATISTICS")
     print("=" * 70 + "\n")
 
-    print("Logging Middleware:")
-    logging_stats = logging_mw.get_stats()
-    print(f"  Total calls: {logging_stats['total_calls']}")
+    print("Logging Callback:")
+    logging_stats = logging_cb.get_stats()
+    print(f"  LLM calls: {logging_stats['llm_calls']}")
+    print(f"  Tool calls: {logging_stats['tool_calls']}")
+    print(f"  Total logs: {logging_stats['total_logs']}")
     print()
 
-    print("Security Middleware:")
-    security_stats = security_mw.get_stats()
-    print(f"  Calls blocked: {security_stats['calls_blocked']}")
+    print("Security Callback:")
+    security_stats = security_cb.get_stats()
+    print(f"  Blocked calls: {security_stats['blocked_calls']}")
     print(f"  High-risk tools: {', '.join(security_stats['high_risk_tools'])}")
     print()
 
-    print("Token Limit Middleware:")
-    token_stats = token_mw.get_stats()
-    print(f"  Total tokens used: {token_stats['total_tokens_used']}")
-    print(f"  Calls throttled: {token_stats['calls_throttled']}")
+    print("Token Counter Callback:")
+    token_stats = token_cb.get_stats()
+    print(f"  Total tokens: {token_stats['total_tokens']}")
+    print(f"  Calls over limit: {token_stats['calls_over_limit']}")
     print()
 
 
@@ -434,38 +409,39 @@ def test_agent_with_middleware():
 
 if __name__ == "__main__":
     print("\n")
-    print("TARGET LangChain 1.0 - Agent with OFFICIAL Middleware API")
+    print("🎯 LangChain 1.0 - Agent with Official Callback API")
     print("=" * 70)
     print()
     print("Features:")
-    print("  OK ОФІЦІЙНИЙ AgentMiddleware API")
-    print("  OK before_model + after_model hooks")
-    print("  OK wrap_model_call для модифікації")
-    print("  OK Real financial data (yfinance)")
-    print("  OK Security middleware (blocks risky tools)")
-    print("  OK Token limiting middleware")
-    print("  OK LangSmith automatic tracing")
+    print("  ✅ ОФІЦІЙНИЙ BaseCallbackHandler API")
+    print("  ✅ on_llm_start + on_llm_end hooks")
+    print("  ✅ on_tool_start + on_tool_end hooks")
+    print("  ✅ on_agent_action для перехоплення дій")
+    print("  ✅ Real financial data (yfinance)")
+    print("  ✅ Security callback (detects risky actions)")
+    print("  ✅ Token counting callback")
+    print("  ✅ LangSmith automatic tracing")
     print()
     print("=" * 70 + "\n")
 
     # Перевірка API ключів
     if not os.getenv("OPENAI_API_KEY"):
-        print("ERROR: OPENAI_API_KEY not found in environment!")
+        print("❌ ERROR: OPENAI_API_KEY not found in environment!")
         print("Please set it in .env file")
         exit(1)
 
     try:
-        test_agent_with_middleware()
+        test_agent_with_callbacks()
 
         print("\n" + "=" * 70)
-        print("OK ALL TESTS COMPLETED")
+        print("✅ ALL TESTS COMPLETED")
         print("=" * 70)
-        print("\nTIP: Check LangSmith dashboard to see middleware traces:")
+        print("\n💡 Check LangSmith dashboard to see callback traces:")
         print("   https://smith.langchain.com/\n")
 
     except KeyboardInterrupt:
-        print("\n\nTests interrupted by user")
+        print("\n\n⏹️  Tests interrupted by user")
     except Exception as e:
-        print(f"\n\nERROR: {e}")
+        print(f"\n\n❌ ERROR: {e}")
         import traceback
         traceback.print_exc()

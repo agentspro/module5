@@ -15,9 +15,9 @@ All agents include **LangSmith tracing** for full observability.
 
 ## Features
 
-### LangChain 1.0 (October 2025)
+### LangChain 1.0
 -  `create_agent()` - New unified agent creation API
--  Middleware architecture with three hooks
+-  Callbacks architecture with BaseCallbackHandler
 -  Stable APIs (no breaking changes until 2.0)
 -  Production-ready patterns
 
@@ -37,13 +37,26 @@ All agents include **LangSmith tracing** for full observability.
 
 ## Setup
 
-### 1. Install Dependencies
+### 1. Create Virtual Environment (Recommended)
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate it
+source venv/bin/activate  # On macOS/Linux
+# venv\Scripts\activate   # On Windows
+```
+
+**ВАЖЛИВО:** Використовуйте Python 3.11 або новіший (не 3.14, оскільки є проблеми сумісності з Pydantic).
+
+### 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment
+### 3. Configure Environment
 
 Copy `.env.example` to `.env` and fill in your API keys:
 

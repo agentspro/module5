@@ -283,6 +283,18 @@ def main():
     print("FINAL PROJECT DELIVERABLES")
     print("=" * 80)
     print()
+    print("⚠️  ВАЖЛИВО: Результат виводиться ТІЛЬКИ В КОНСОЛЬ!")
+    print("   CrewAI НЕ створює файли автоматично.")
+    print("   Ви побачите:")
+    print("   • Requirements document (від Requirements Analyst)")
+    print("   • Architecture design (від Software Architect)")
+    print("   • Backend specs (від Backend Developer)")
+    print("   • Frontend specs (від Frontend Developer)")
+    print("   • Testing strategy (від QA Engineer)")
+    print()
+    print("   Якщо потрібно зберегти в файл - додайте Task з FileWriteTool")
+    print("=" * 80)
+    print()
     print(result)
     print()
     print("=" * 80)
@@ -447,4 +459,31 @@ Manager will:
 4. Review architecture, delegate to developers
 5. Review implementations, delegate to QA
 6. Validate final deliverables
+
+⚠️  ВАЖЛИВО - РЕЗУЛЬТАТИ:
+- Всі результати виводяться В КОНСОЛЬ (не створюються файли)
+- Ви побачите документи від кожного агента у вигляді тексту
+- Якщо потрібно зберегти результат у файл - є 2 варіанти:
+
+  Варіант 1 - Копіювати з консолі вручну
+
+  Варіант 2 - Додати Task з FileWriteTool:
+  ```python
+  from crewai_tools import FileWriteTool
+
+  file_writer = FileWriteTool()
+
+  save_task = Task(
+      description="Save the final deliverables to project_plan.md file",
+      expected_output="Confirmation that file was saved",
+      agent=some_agent,
+      tools=[file_writer]
+  )
+  ```
+
+DELEGATION ERRORS:
+- Помилки делегування (delegation errors) - це нормально в hierarchical режимі
+- Manager може перепризначити завдання іншому агенту якщо перший не справився
+- Це частина процесу самокорекції
+- Якщо зависло - встановіть max_iterations у Crew(..., max_iterations=10)
 """

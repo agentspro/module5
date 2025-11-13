@@ -24,7 +24,7 @@ from crewai_tools import (
     FileReadTool,
     DirectoryReadTool,
 )
-from langchain.tools import Tool
+from langchain.tools import tool
 from typing import Dict, Any
 import json
 
@@ -36,17 +36,10 @@ if not os.getenv("OPENAI_API_KEY"):
     raise ValueError("OPENAI_API_KEY not found in environment variables")
 
 
-# Custom tool for data analysis
+# Custom tools using @tool decorator (CORRECT LangChain API)
+@tool
 def analyze_data(data_json: str) -> str:
-    """
-    Analyze JSON data and return statistical insights.
-
-    Args:
-        data_json: JSON string containing data to analyze
-
-    Returns:
-        str: Analysis results with statistics
-    """
+    """Analyze JSON data and return statistical insights. Input should be a valid JSON string."""
     try:
         data = json.loads(data_json)
 
@@ -82,16 +75,9 @@ def analyze_data(data_json: str) -> str:
         return f"Error analyzing data: {str(e)}"
 
 
+@tool
 def calculate_metrics(expression: str) -> str:
-    """
-    Safely evaluate mathematical expressions.
-
-    Args:
-        expression: Mathematical expression as string
-
-    Returns:
-        str: Result of calculation
-    """
+    """Safely evaluate mathematical expressions. Input should be a Python expression like '2 + 2' or 'sum([1,2,3])'."""
     try:
         # Safe eval for basic math
         allowed_names = {"abs": abs, "min": min, "max": max, "sum": sum}
@@ -99,28 +85,6 @@ def calculate_metrics(expression: str) -> str:
         return f"Result: {result}"
     except Exception as e:
         return f"Error in calculation: {str(e)}"
-
-
-# Create custom tools
-data_analysis_tool = Tool(
-    name="DataAnalyzer",
-    func=analyze_data,
-    description=(
-        "Analyzes JSON data and provides statistical insights. "
-        "Input should be a valid JSON string. "
-        "Returns statistics like count, average, min, max for numerical data."
-    )
-)
-
-calculator_tool = Tool(
-    name="Calculator",
-    func=calculate_metrics,
-    description=(
-        "Performs mathematical calculations. "
-        "Input should be a Python expression like '2 + 2' or 'sum([1,2,3])'. "
-        "Returns the calculated result."
-    )
-)
 
 # File tools
 file_read_tool = FileReadTool()
@@ -183,8 +147,8 @@ def create_research_crew():
             "quantitative and qualitative analysis methods."
         ),
         tools=[
-            data_analysis_tool,
-            calculator_tool
+            analyze_data,
+            calculate_metrics
         ],
         verbose=True,
         allow_delegation=False,
@@ -349,24 +313,19 @@ def main():
 
 def example_with_custom_tools():
     """
-    Example showing custom tool creation.
+    Example showing custom tool creation with @tool decorator.
     """
 
+    @tool
     def custom_formatter(text: str) -> str:
         """Format text to uppercase."""
         return text.upper()
-
-    format_tool = Tool(
-        name="TextFormatter",
-        func=custom_formatter,
-        description="Converts text to uppercase"
-    )
 
     agent = Agent(
         role="Text Processor",
         goal="Process text with formatting tools",
         backstory="Expert in text processing",
-        tools=[format_tool],
+        tools=[custom_formatter],
         verbose=True,
         llm="gpt-4o-mini"
     )
@@ -402,7 +361,7 @@ KEY CONCEPTS DEMONSTRATED:
 1. TOOL INTEGRATION:
    - LangChain tools work seamlessly with CrewAI
    - CrewAI provides its own tool library (crewai_tools)
-   - Custom tools created with langchain.tools.Tool
+   - Custom tools created with @tool decorator (langchain_core.tools.tool)
    - Tools assigned per agent
 
 2. TOOL TYPES:
@@ -438,23 +397,25 @@ KEY CONCEPTS DEMONSTRATED:
 
 CREATING CUSTOM TOOLS:
 
-Method 1 - Using langchain.tools.Tool:
+Method 1 - Using @tool decorator (RECOMMENDED):
 ```python
-tool = Tool(
-    name="ToolName",
-    func=my_function,
-    description="What this tool does"
-)
-```
-
-Method 2 - Using @tool decorator:
-```python
-from langchain.tools import tool
+from langchain_core.tools import tool
 
 @tool
 def my_tool(input: str) -> str:
     "Tool description"
     return result
+```
+
+Method 2 - Using StructuredTool (for complex schemas):
+```python
+from langchain_core.tools import StructuredTool
+
+tool = StructuredTool.from_function(
+    func=my_function,
+    name="ToolName",
+    description="What this tool does"
+)
 ```
 
 Method 3 - CrewAI custom tool:

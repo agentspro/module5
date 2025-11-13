@@ -342,12 +342,24 @@ python 04_memory_enabled_crew.py
 
 ### Встановлення
 
-1. Встановіть залежності:
+1. Створіть віртуальне середовище (рекомендовано):
+```bash
+# Створити venv
+python3 -m venv venv
+
+# Активувати
+source venv/bin/activate  # macOS/Linux
+# venv\Scripts\activate   # Windows
+```
+
+**ВАЖЛИВО:** Використовуйте Python 3.11 (не 3.14, є проблеми сумісності).
+
+2. Встановіть залежності:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Створіть `.env` файл:
+3. Створіть `.env` файл:
 ```bash
 cp .env.example .env
 ```
