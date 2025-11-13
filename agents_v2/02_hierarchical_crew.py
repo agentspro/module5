@@ -13,7 +13,7 @@ In hierarchical mode, a manager agent:
 3. Reviews and validates outputs
 4. Ensures quality standards
 
-CrewAI Version: 0.98.0+
+CrewAI Version: 1.4.0+
 Python: 3.10-3.13
 """
 

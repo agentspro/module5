@@ -49,6 +49,7 @@ module5/
 - OpenAI GPT-4o-mini
 - FAISS vector store
 - LangSmith tracing
+- **РЕАЛЬНІ API:** OpenWeatherMap, Tavily Search, yfinance
 
 [Детальна документація в agents_v1/README.md](agents_v1/README.md)
 
@@ -78,6 +79,7 @@ module5/
 - LangChain tools integration
 - LangMem для персистентної пам'яті
 - Multimodal support
+- **РЕАЛЬНІ API:** Tavily Search, File I/O tools, Data analysis
 
 [Детальна документація в agents_v2/README.md](agents_v2/README.md)
 
@@ -114,13 +116,20 @@ cp .env.example .env
 Створіть файл `.env` у відповідній папці:
 
 ```bash
-# OpenAI API
+# OpenAI API (Required)
 OPENAI_API_KEY=sk-your-openai-api-key-here
 
-# LangSmith (опціонально, для трейсингу)
+# LangSmith (Optional, для трейсингу)
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_API_KEY=ls__your-langsmith-api-key-here
 LANGCHAIN_PROJECT=your-project-name
+
+# Real API Integrations (Required для agent tools)
+# OpenWeatherMap - безкоштовна реєстрація
+OPENWEATHERMAP_API_KEY=your-key-here  # https://openweathermap.org/api
+
+# Tavily Search - безкоштовна реєстрація
+TAVILY_API_KEY=tvly-your-key-here  # https://tavily.com
 ```
 
 ### Запуск прикладів

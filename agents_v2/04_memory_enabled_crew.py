@@ -13,7 +13,7 @@ Memory types in CrewAI:
 - Entity memory: Information about specific entities
 - Contextual memory: Task and agent-specific context
 
-CrewAI Version: 0.98.0+
+CrewAI Version: 1.4.0+
 Python: 3.10-3.13
 """
 
@@ -170,7 +170,7 @@ def create_memory_enabled_crew():
         process=Process.sequential,
         verbose=True,
         memory=True,  # Enable memory
-        embedder={
+        embedding_model={
             "provider": "openai",
             "config": {
                 "model": "text-embedding-3-small"
@@ -295,7 +295,7 @@ def example_learning_preferences():
         process=Process.sequential,
         verbose=True,
         memory=True,
-        embedder={
+        embedding_model={
             "provider": "openai",
             "config": {"model": "text-embedding-3-small"}
         }
@@ -389,12 +389,12 @@ KEY CONCEPTS DEMONSTRATED:
    - Maintain consistency
    - Recall decisions
 
-EMBEDDER CONFIGURATION:
+EMBEDDING MODEL CONFIGURATION:
 
 CrewAI uses embeddings to store and retrieve memories:
 
 ```python
-embedder={
+embedding_model={
     "provider": "openai",  # or "cohere", "huggingface"
     "config": {
         "model": "text-embedding-3-small"
@@ -438,11 +438,11 @@ While CrewAI handles memory automatically, you can:
    crew = Crew(..., memory=True)
    ```
 
-2. Configure Embedder:
+2. Configure Embedding Model:
    ```python
    crew = Crew(
        ...,
-       embedder={"provider": "openai", "config": {...}}
+       embedding_model={"provider": "openai", "config": {...}}
    )
    ```
 

@@ -19,5 +19,11 @@ pydantic>=2.0.0,<3.0.0
 # Environment configuration
 python-dotenv>=1.0.0
 
+# Real API integrations
+requests>=2.31.0
+numexpr>=2.8.0
+tavily-python>=0.3.0
+yfinance>=0.2.0
+
 # Optional: LangSmith SDK (automatically included with langchain>=1.0)
 # langsmith>=0.1.0
