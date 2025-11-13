@@ -20,6 +20,7 @@ Python: 3.10-3.13
 import os
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process
+from crewai_tools import FileWriteTool
 
 # Load environment variables
 load_dotenv()
@@ -113,6 +114,20 @@ def create_software_development_crew():
         verbose=True,
         allow_delegation=False,
         llm="gpt-4o-mini"
+    )
+
+    documentation_specialist = Agent(
+        role="Documentation Specialist",
+        goal="Compile and save all project deliverables into organized documentation files",
+        backstory=(
+            "You are a technical writer who specializes in creating comprehensive "
+            "project documentation. You gather all outputs from the team and organize "
+            "them into well-structured markdown files for easy reference."
+        ),
+        verbose=True,
+        allow_delegation=False,
+        llm="gpt-4o-mini",
+        tools=[FileWriteTool()]
     )
 
     # Define tasks (manager will delegate appropriately)
@@ -210,6 +225,25 @@ def create_software_development_crew():
         agent=qa_engineer
     )
 
+    save_deliverables_task = Task(
+        description=(
+            "Compile all project deliverables for {project_name} and save them to a file. "
+            "Create a comprehensive markdown document that includes:\n"
+            "1. Requirements documentation\n"
+            "2. System architecture design\n"
+            "3. Backend implementation specifications\n"
+            "4. Frontend implementation specifications\n"
+            "5. Testing strategy\n\n"
+            "Save the complete documentation to 'project_deliverables.md' file.\n"
+            "Use proper markdown formatting with headers, lists, and code blocks."
+        ),
+        expected_output=(
+            "Confirmation that all deliverables have been saved to project_deliverables.md file "
+            "with proper formatting and organization."
+        ),
+        agent=documentation_specialist
+    )
+
     # Create hierarchical crew
     # Manager agent is auto-created by CrewAI
     crew = Crew(
@@ -218,14 +252,16 @@ def create_software_development_crew():
             architect,
             backend_dev,
             frontend_dev,
-            qa_engineer
+            qa_engineer,
+            documentation_specialist
         ],
         tasks=[
             requirements_task,
             architecture_task,
             backend_task,
             frontend_task,
-            testing_task
+            testing_task,
+            save_deliverables_task
         ],
         process=Process.hierarchical,  # Enables manager coordination
         verbose=True,
@@ -252,6 +288,7 @@ def main():
     print("  +-- Backend Developer")
     print("  +-- Frontend Developer")
     print("  +-- QA Engineer")
+    print("  +-- Documentation Specialist (saves to file)")
     print()
     print("The manager will:")
     print("  1. Plan the execution strategy")
@@ -283,22 +320,23 @@ def main():
     print("FINAL PROJECT DELIVERABLES")
     print("=" * 80)
     print()
-    print("⚠️  ВАЖЛИВО: Результат виводиться ТІЛЬКИ В КОНСОЛЬ!")
-    print("   CrewAI НЕ створює файли автоматично.")
-    print("   Ви побачите:")
+    print("✅ Результати збережено у файл: project_deliverables.md")
+    print()
+    print("Файл містить:")
     print("   • Requirements document (від Requirements Analyst)")
     print("   • Architecture design (від Software Architect)")
     print("   • Backend specs (від Backend Developer)")
     print("   • Frontend specs (від Frontend Developer)")
     print("   • Testing strategy (від QA Engineer)")
     print()
-    print("   Якщо потрібно зберегти в файл - додайте Task з FileWriteTool")
+    print("Також результати виведено в консоль:")
     print("=" * 80)
     print()
     print(result)
     print()
     print("=" * 80)
     print("Hierarchical crew execution completed!")
+    print("Check project_deliverables.md for saved documentation")
     print("=" * 80)
 
 
@@ -460,24 +498,26 @@ Manager will:
 5. Review implementations, delegate to QA
 6. Validate final deliverables
 
-⚠️  ВАЖЛИВО - РЕЗУЛЬТАТИ:
-- Всі результати виводяться В КОНСОЛЬ (не створюються файли)
-- Ви побачите документи від кожного агента у вигляді тексту
-- Якщо потрібно зберегти результат у файл - є 2 варіанти:
+✅ АВТОМАТИЧНЕ ЗБЕРЕЖЕННЯ РЕЗУЛЬТАТІВ:
+- Цей скрипт використовує FileWriteTool для автоматичного збереження
+- Створюється агент "Documentation Specialist" з FileWriteTool
+- Останній Task збирає всі результати та зберігає у project_deliverables.md
+- Результати також виводяться в консоль для перегляду
 
-  Варіант 1 - Копіювати з консолі вручну
-
-  Варіант 2 - Додати Task з FileWriteTool:
+Реалізація:
   ```python
   from crewai_tools import FileWriteTool
 
-  file_writer = FileWriteTool()
+  documentation_specialist = Agent(
+      role="Documentation Specialist",
+      goal="Compile and save all project deliverables",
+      tools=[FileWriteTool()]
+  )
 
   save_task = Task(
-      description="Save the final deliverables to project_plan.md file",
+      description="Save all deliverables to project_deliverables.md",
       expected_output="Confirmation that file was saved",
-      agent=some_agent,
-      tools=[file_writer]
+      agent=documentation_specialist
   )
   ```
 
