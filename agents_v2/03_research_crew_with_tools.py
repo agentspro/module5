@@ -13,7 +13,7 @@ Tools enable agents to:
 - Perform calculations
 - Access external APIs
 
-CrewAI Version: 0.98.0+
+CrewAI Version: 1.4.0+
 Python: 3.10-3.13
 """
 
@@ -25,7 +25,6 @@ from crewai_tools import (
     DirectoryReadTool,
 )
 from langchain.tools import Tool
-from langchain_community.utilities import SerpAPIWrapper
 from typing import Dict, Any
 import json
 
