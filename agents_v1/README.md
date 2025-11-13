@@ -53,10 +53,17 @@ cp .env.example .env
 
 Required variables:
 ```bash
+# OpenAI (Required)
 OPENAI_API_KEY=sk-your-key          # Get from https://platform.openai.com/api-keys
+
+# LangSmith (Optional - for tracing)
 LANGCHAIN_TRACING_V2=true            # Enable LangSmith tracing
 LANGCHAIN_API_KEY=ls__your-key       # Get from https://smith.langchain.com
 LANGCHAIN_PROJECT=langchain-v1-agents
+
+# Real API Integrations (Required for agent tools)
+OPENWEATHERMAP_API_KEY=your-key     # Get from https://openweathermap.org/api
+TAVILY_API_KEY=tvly-your-key        # Get from https://tavily.com
 ```
 
 ## Agents
@@ -71,9 +78,10 @@ User Query  Agent  Tool Selection  Tool Execution  Response
 ```
 
 **Tools:**
-- `get_weather` - Weather information for any location
-- `calculate` - Mathematical expression evaluation
-- `search_docs` - Technical documentation search
+- `get_weather` - Real weather data via OpenWeatherMap API
+- `web_search` - Real web search via Tavily Search API
+- `calculate` - Safe calculations using numexpr
+- `get_stock_price` - Real stock prices via yfinance API
 
 **Run:**
 ```bash
@@ -596,6 +604,24 @@ result = agent.invoke({
 - **LangGraph Docs:** https://langchain-ai.github.io/langgraph/
 - **LangSmith:** https://smith.langchain.com
 - **LangChain 1.0 Release Notes:** https://blog.langchain.dev/langchain-v1-0/
+
+## Changelog
+
+### 2025-11-13
+- Замінено всі моки на реальні API інтеграції
+  - OpenWeatherMap API для погоди
+  - Tavily Search API для веб-пошуку
+  - yfinance для біржових даних
+- Виправлено middleware на офіційний LangChain 1.0 API
+- Додано безпечні обчислення через numexpr (замість eval)
+- Оновлено requirements.txt та .env.example
+
+### 2025-11-09
+- Створено 4 production-ready агенти на LangChain 1.0 / LangGraph 1.0
+- Впроваджено офіційний `create_agent` API
+- Додано middleware архітектуру
+- Реалізовано Agentic RAG з StateGraph
+- Додано Supervisor Pattern для multi-agent системи
 
 ## License
 

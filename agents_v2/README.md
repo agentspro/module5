@@ -223,7 +223,7 @@ crew = Crew(
     agents=[...],
     tasks=[...],
     memory=True,
-    embedder={
+    embedding_model={
         "provider": "openai",
         "config": {
             "model": "text-embedding-3-small"
@@ -369,8 +369,8 @@ CREWAI_TELEMETRY=false
 ### Залежності
 
 ```
-crewai>=0.98.0          # Основний фреймворк
-crewai-tools>=0.12.0    # Бібліотека інструментів
+crewai>=1.4.0           # Основний фреймворк
+crewai-tools>=0.38.0    # Бібліотека інструментів
 langchain>=0.3.0        # LangChain integration
 langchain-openai        # OpenAI інтеграція
 openai>=1.50.0          # OpenAI SDK
@@ -472,9 +472,9 @@ langmem>=0.1.0          # Advanced memory (опціонально)
 
 **Рішення:**
 1. Перевірте `memory=True` в Crew
-2. Налаштуйте `embedder` конфігурацію
+2. Налаштуйте `embedding_model` конфігурацію
 3. Переконайтеся, що OPENAI_API_KEY доступний
-4. Перевірте версію CrewAI (>=0.98.0)
+4. Перевірте версію CrewAI (>=1.4.0)
 
 ### Високе використання токенів
 
@@ -532,6 +532,12 @@ langmem>=0.1.0          # Advanced memory (опціонально)
 - [OpenAI API](https://platform.openai.com/docs/api-reference)
 
 ## Changelog
+
+### 2025-11-13
+- Оновлено до CrewAI 1.4.0 (з 0.98.0)
+- Міграція `embedder` → `embedding_model` (breaking change)
+- Оновлено crewai-tools до 0.38.0
+- Оновлено документацію з новим API
 
 ### 2025-11-09
 - Створено 4 практичні приклади на CrewAI 0.98.0
