@@ -618,24 +618,6 @@ result = agent.invoke({
 - **LangSmith:** https://smith.langchain.com
 - **LangChain 1.0 Release Notes:** https://blog.langchain.dev/langchain-v1-0/
 
-## Changelog
-
-### 2025-11-13
-- Замінено всі моки на реальні API інтеграції
-  - OpenWeatherMap API для погоди
-  - Tavily Search API для веб-пошуку
-  - yfinance для біржових даних
-- Виправлено middleware на офіційний LangChain 1.0 API
-- Додано безпечні обчислення через numexpr (замість eval)
-- Оновлено requirements.txt та .env.example
-
-### 2025-11-09
-- Створено 4 production-ready агенти на LangChain 1.0 / LangGraph 1.0
-- Впроваджено офіційний `create_agent` API
-- Додано middleware архітектуру
-- Реалізовано Agentic RAG з StateGraph
-- Додано Supervisor Pattern для multi-agent системи
-
 ## License
 
 MIT

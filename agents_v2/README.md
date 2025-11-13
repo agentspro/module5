@@ -543,20 +543,6 @@ langmem>=0.1.0          # Advanced memory (опціонально)
 - [LangChain Tools](https://python.langchain.com/docs/integrations/tools/)
 - [OpenAI API](https://platform.openai.com/docs/api-reference)
 
-## Changelog
-
-### 2025-11-13
-- Оновлено до CrewAI 1.4.0 (з 0.98.0)
-- Міграція `embedder` → `embedding_model` (breaking change)
-- Оновлено crewai-tools до 0.38.0
-- Оновлено документацію з новим API
-
-### 2025-11-09
-- Створено 4 практичні приклади на CrewAI 0.98.0
-- Додано документацію для всіх core concepts
-- Включено best practices та troubleshooting
-- Приклади з sequential, hierarchical, tools, memory
-
 ## Ліцензія
 
 MIT License
