@@ -219,18 +219,3 @@ MIT License
 ## Автор
 
 sanyaden <alex.denysyuk@gmail.com>
-
----
-
-## Changelog
-
-### 2025-11-13
-- Оновлено CrewAI до версії 1.4.0 (з 0.98.0)
-- Міграція embedder → embedding_model (breaking change)
-- Замінено всі моки на реальні API інтеграції (OpenWeatherMap, Tavily, yfinance)
-- Виправлено LangChain middleware на офіційний 1.0 API
-
-### 2025-11-09
-- Створено agents_v1 з 4 агентами на LangChain 1.0 / LangGraph 1.0
-- Додано agents_v2 з 4 прикладами на CrewAI
-- Додано порівняльний аналіз фреймворків
