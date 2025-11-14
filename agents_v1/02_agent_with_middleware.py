@@ -20,9 +20,13 @@ from langchain.agents import create_agent
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.outputs import LLMResult
 from langchain_core.agents import AgentAction, AgentFinish
+from openinference.instrumentation.langchain import LangChainInstrumentor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from dotenv import load_dotenv
 from datetime import datetime
 import json
+import phoenix as px
+from phoenix.otel import register
 
 load_dotenv()
 
@@ -162,7 +166,7 @@ class LoggingCallback(BaseCallbackHandler):
 
         print(f"\n{'='*60}")
         print(f"✅ TOOL COMPLETED")
-        print(f"📤 Output: {output[:100]}...")
+        print(f"📤 Output: {output.content[:100]}...")
         print(f"{'='*60}\n")
 
     def get_stats(self):
@@ -265,6 +269,43 @@ class TokenCountCallback(BaseCallbackHandler):
             "max_tokens": self.max_tokens
         }
 
+class PerformanceCallback(BaseCallbackHandler):
+    """
+    Callback для моніторингу часу виконання
+    """
+    def __init__(self):
+        super().__init__()
+        self.start_time = None
+        self.end_time = None
+        
+    def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any) -> None:
+        """Викликається ПЕРЕД кожним викликом LLM"""
+        self.start_time = datetime.now().timestamp()
+        
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        """Викликається ПІСЛЯ кожного виклику LLM"""
+        self.end_time = datetime.now().timestamp()
+        print(f"{'='*60}\n")
+        print(f"Виклик LLM тривав: {self.end_time - self.start_time} секунд\n")
+
+    def on_tool_start(self, serialized: Dict[str, Any], input_str: str, **kwargs: Any) -> None:
+        """Викликається ПЕРЕД кожним викликом tool"""
+        self.start_time = datetime.now().timestamp()
+        
+    def on_tool_end(self, output: str, **kwargs: Any) -> None:
+        """Викликається ПІСЛЯ кожного виклику tool"""
+        self.end_time = datetime.now().timestamp()
+        print(f"{'='*60}\n")
+        print(f"Виклик tool тривав: {self.end_time - self.start_time} секунд\n")
+
+        return output
+        
+    def get_stats(self):
+        """Повертає статистику часу виконання"""
+        return {
+            "start_time": self.start_time,
+            "end_time": self.end_time
+        }
 
 # ============================================================================
 # СТВОРЕННЯ АГЕНТА З CALLBACKS - ОФІЦІЙНИЙ API
@@ -288,6 +329,7 @@ def create_agent_with_callbacks():
     logging_cb = LoggingCallback()
     security_cb = SecurityCallback()
     token_cb = TokenCountCallback(max_tokens=10000)
+    performance_cb = PerformanceCallback()
 
     # Tools
     tools = [get_stock_price, send_notification, execute_trade]
@@ -302,6 +344,7 @@ def create_agent_with_callbacks():
     print("  1. LoggingCallback (on_llm_start + on_llm_end + on_tool_*)")
     print("  2. SecurityCallback (on_agent_action)")
     print("  3. TokenCountCallback (on_llm_start + on_llm_end)")
+    print("  4. PerformanceCallback (on_llm_start + on_llm_end + on_tool_start + on_tool_end)")
     print()
 
     # Створюємо агента з LangChain 1.0 API
@@ -315,7 +358,16 @@ IMPORTANT: When considering high-risk actions like execute_trade or send_notific
 Think step-by-step and use tools when needed to answer questions accurately."""
     )
 
-    return agent, logging_cb, security_cb, token_cb
+    return agent, logging_cb, security_cb, token_cb, performance_cb
+
+def check_phoenix_http(endpoint="localhost:4317"):
+    try:
+        exporter = OTLPSpanExporter(endpoint=endpoint, insecure=True, timeout=2, logging=False)
+        # Спроба виклику — експортер під’єднається до серверу
+        exporter.export([])
+        return True
+    except Exception:
+        return False
 
 
 # ============================================================================
@@ -325,7 +377,14 @@ Think step-by-step and use tools when needed to answer questions accurately."""
 def test_agent_with_callbacks():
     """Тестує агента з різними callback scenarios"""
 
-    agent_executor, logging_cb, security_cb, token_cb = create_agent_with_callbacks()
+    if check_phoenix_http():
+        print ("Використання Phoenix для трасування\n")
+        tracer_provider = register()
+        LangChainInstrumentor(tracer_provider=tracer_provider).instrument(skip_dep_check=True)
+    else:
+        print ("Phoenix трасування неможливе, оскільки сервер недоступний\n")
+
+    agent, logging_cb, security_cb, token_cb, performance_cb = create_agent_with_callbacks()
 
     test_queries = [
         {
@@ -357,7 +416,7 @@ def test_agent_with_callbacks():
             # LangChain 1.0 create_agent invoke з callbacks
             result = agent.invoke({
                 "messages": [{"role": "user", "content": test["query"]}]
-            }, config={"callbacks": [logging_cb, security_cb, token_cb]})
+            }, config={"callbacks": [logging_cb, security_cb, token_cb, performance_cb]})
 
             # Extract output from messages
             if isinstance(result, dict) and "messages" in result:
@@ -402,6 +461,12 @@ def test_agent_with_callbacks():
     print(f"  Calls over limit: {token_stats['calls_over_limit']}")
     print()
 
+    print("Performance Callback:")
+    performance_stats = performance_cb.get_stats()
+    print(f"  Start time: {performance_stats['start_time']}")
+    print(f"  End time: {performance_stats['end_time']}")
+    print()
+
 
 # ============================================================================
 # MAIN
@@ -420,6 +485,7 @@ if __name__ == "__main__":
     print("  ✅ Real financial data (yfinance)")
     print("  ✅ Security callback (detects risky actions)")
     print("  ✅ Token counting callback")
+    print("  ✅ Performance monitoring callback")
     print("  ✅ LangSmith automatic tracing")
     print()
     print("=" * 70 + "\n")
