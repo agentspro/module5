@@ -27,3 +27,6 @@ yfinance>=0.2.0
 
 # Optional: LangSmith SDK (automatically included with langchain>=1.0)
 # langsmith>=0.1.0
+
+arize-phoenix>=12.15
+openinference-instrumentation-langchain>=0.1.0
