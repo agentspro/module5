@@ -20,7 +20,7 @@ Python: 3.10-3.13
 import os
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process
-from crewai_tools import FileWriteTool
+from crewai_tools import FileWriterTool
 
 # Load environment variables
 load_dotenv()
@@ -127,7 +127,7 @@ def create_software_development_crew():
         verbose=True,
         allow_delegation=False,
         llm="gpt-4o-mini",
-        tools=[FileWriteTool()]
+        tools=[FileWriterTool()]
     )
 
     # Define tasks (manager will delegate appropriately)
@@ -506,7 +506,7 @@ Manager will:
 
 Реалізація:
   ```python
-  from crewai_tools import FileWriteTool
+  from crewai_tools import FileWriterTool
 
   documentation_specialist = Agent(
       role="Documentation Specialist",
