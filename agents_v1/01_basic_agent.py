@@ -15,7 +15,11 @@ LangSmith Integration: Автоматично ввімкнений через en
 import os
 import requests
 from langchain.tools import tool  # Офіційний імпорт згідно LangChain docs
-from langchain_community.tools.tavily_search import TavilySearchResults
+# Updated import: deprecated TavilySearchResults replaced by TavilySearch in langchain-tavily package
+try:
+    from langchain_tavily import TavilySearch
+except ImportError:
+    TavilySearch = None  # Graceful fallback if lib not installed
 from dotenv import load_dotenv
 import numexpr as ne
 
@@ -137,12 +141,18 @@ def web_search(query: str) -> str:
         )
 
     try:
-        # Використовуємо Tavily для пошуку
-        search_tool = TavilySearchResults(
+        if TavilySearch is None:
+            return (
+                "ERROR: langchain-tavily not installed. Run: pip install -U langchain-tavily"
+            )
+
+        # Використовуємо оновлений TavilySearch tool (langchain-tavily)
+        search_tool = TavilySearch(
             max_results=3,
             api_key=api_key
         )
 
+        # New tool keeps same invoke contract with a dict
         results = search_tool.invoke({"query": query})
 
         if not results:
@@ -167,6 +177,75 @@ def web_search(query: str) -> str:
         return f"Error searching web: {str(e)}"
 
 
+@tool
+def convert_currency(amount, from_currency, to_currency) -> str:
+    """
+    Convert a monetary `amount` from `from_currency` to `to_currency` using the
+    ExchangeRate-API Pair Conversion endpoint.
+
+    Args:
+        amount: Numeric amount to convert (int/float or numeric string)
+        from_currency: Source currency code (e.g., 'USD')
+        to_currency: Target currency code (e.g., 'EUR')
+
+    Returns:
+        Formatted string with conversion result, rate and update time.
+
+    Notes:
+        - Uses ISO 4217 three-letter codes.
+        - Endpoint docs attached in project.
+        - Requires EXCHANGERATE_API_KEY set in environment (.env).
+    """
+    api_key = os.getenv("EXCHANGERATE_API_KEY")
+    if not api_key:
+        return (
+            "ERROR: EXCHANGERATE_API_KEY not found. "
+            "Get free API key at https://www.exchangerate-api.com"
+        )
+
+    # Normalize inputs
+    try:
+        amt = float(amount)
+    except (ValueError, TypeError):
+        return f"Error: 'amount' must be numeric (got: {amount})"
+
+    base = str(from_currency).upper().strip()
+    target = str(to_currency).upper().strip()
+
+    if len(base) != 3 or len(target) != 3:
+        return "Error: Currency codes must be 3-letter ISO 4217 codes"
+
+    url = f"https://v6.exchangerate-api.com/v6/{api_key}/pair/{base}/{target}/{amt}"
+
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("result") != "success":
+            error_type = data.get("error-type", "unknown-error")
+            return f"Error converting currency: {error_type}"
+
+        rate = data.get("conversion_rate")
+        converted = data.get("conversion_result")
+        last_update = data.get("time_last_update_utc", "N/A")
+
+        if rate is None or converted is None:
+            return "Error: Incomplete response from ExchangeRate API"
+
+        return (
+            f"Currency Conversion:\n"
+            f"  {amt:.2f} {base} -> {converted:.2f} {target}\n"
+            f"  Rate: 1 {base} = {rate:.6f} {target}\n"
+            f"  Last Update: {last_update}"
+        )
+
+    except requests.exceptions.RequestException as e:
+        return f"Network/HTTP error: {e}"
+    except Exception as e:
+        return f"Unexpected error: {e}"
+
+
 # ============================================================================
 # СТВОРЕННЯ БАЗОВОГО АГЕНТА - LangChain 1.0 API
 # ============================================================================
@@ -182,28 +261,54 @@ def create_basic_agent():
     print("=" * 70 + "\n")
 
     # 1. Список реальних tools
-    tools = [get_weather, calculate, web_search]
+    tools = [get_weather, calculate, web_search, convert_currency]
 
     print("Available tools (REAL APIs):")
     for tool_item in tools:
-        print(f"  • {tool_item.name}: {tool_item.description[:60]}...")
+        print(f"  • {tool_item.name}: {tool_item.description[:53]}...")
     print()
 
     # 2. Створення агента з LangChain 1.0 API
     print("✅ Using LangChain 1.0+ create_agent API\n")
 
     agent = create_agent(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         tools=tools,
-        system_prompt="""You are a helpful AI assistant with access to real-time tools.
+        system_prompt="""You are a helpful AI assistant with access to REAL-TIME tools. Always choose a tool when factual / numeric data is requested.
 
-You have access to:
-- Real-time weather data via OpenWeatherMap API
-- Web search via Tavily API for current information
-- Safe calculator for mathematical operations
+TOOLS & USAGE RULES:
+1. Weather (get_weather): Use ONLY for current weather in a city. Never guess weather.
+2. Web Search (web_search): Use for current events, recent changes, news, or info not in your static memory. If the user asks for 'latest', 'current', 'recent', or cites a date in 2024/2025 -> use web_search.
+3. Calculator (calculate): Use for pure mathematical expressions (includes sqrt, log, sin, ratios). If user asks multi-step math or arithmetic embedded in text, extract the expression and call calculate.
+4. Currency Conversion (convert_currency): MANDATORY for ANY request about converting money OR asking an exchange rate between two currencies. NEVER hallucinate or approximate exchange rates.
 
-Use the appropriate tool for each request and provide accurate, helpful responses.
-When using tools, explain what you're doing and present results clearly."""
+CURRENCY CONVERSION INSTRUCTIONS:
+- Trigger convert_currency when user says phrases like: "convert", "exchange", "how much is", "what is X USD in EUR", "rate USD to EUR", etc.
+- If user asks "Convert 100 USD to EUR" -> amount=100, from_currency=USD, to_currency=EUR.
+- If user asks only for the rate (e.g., "What's the USD to JPY rate?") call convert_currency with amount=1.
+- Normalize currency codes to uppercase 3-letter ISO (usd -> USD). If non-ISO or slang (e.g., 'bucks') ASK the user to clarify rather than guessing.
+- If API returns an error, surface the error concisely and invite the user to verify codes or retry.
+
+DECISION LOGIC (STRICT):
+- Any message containing pattern: /(convert|exchange|rate|USD|EUR|GBP|JPY|AUD|CAD|CHF|CNY|INR)/ AND two currency-like tokens -> use convert_currency.
+- Do NOT use web_search for currency exchange unless specifically asked for sources or historical trends. For direct numeric conversion always use convert_currency.
+
+MULTIPLE REQUESTS:
+- If user combines weather + math + currency etc., you may call tools sequentially. Prioritize: weather first, then currency, then math, then web search if needed.
+
+FORMAT OUTPUT:
+- After a tool call, clearly label the section. Example:
+  "[Tool: convert_currency]\n" then result.
+- Do not add speculative commentary if tool provided authoritative data.
+
+FAILURE HANDLING:
+- If a tool fails, explain briefly and offer next steps (e.g., confirm city spelling, confirm currency code, retry later).
+
+NEVER:
+- Never fabricate exchange rates, weather details, or search results.
+- Never bypass a tool for data it can provide.
+
+GOAL: Precise, tool-backed answers. Always err toward invoking the correct tool rather than guessing."""
     )
 
     return agent
@@ -220,6 +325,14 @@ def test_basic_agent():
 
     # Тестові запити що використовують реальні API
     test_queries = [
+        {
+            "query": "Convert 100 USD to EUR",
+            "expected_tool": "convert_currency"
+        },
+        {
+            "query": "Convert 250 eur to gbp",
+            "expected_tool": "convert_currency"
+        },
         {
             "query": "What's the current weather in London?",
             "expected_tool": "get_weather"
