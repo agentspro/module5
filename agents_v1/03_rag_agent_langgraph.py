@@ -26,7 +26,14 @@ from langchain_community.vectorstores import FAISS
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from pydantic import BaseModel, Field
+# Updated import: deprecated TavilySearchResults replaced by TavilySearch in langchain-tavily package
+try:
+    from langchain_tavily import TavilySearch
+except ImportError:
+    TavilySearch = None  # Graceful fallback if lib not installed
+
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
@@ -208,7 +215,7 @@ def grade_documents(state: RAGState) -> RAGState:
         relevance: str = Field(description="'relevant' or 'irrelevant'")
         reasoning: str = Field(description="Why this grade")
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatOpenAI(model="gpt-4o", temperature=0)
     structured_llm = llm.with_structured_output(GradeOutput)
 
     grade_prompt = ChatPromptTemplate.from_messages([
@@ -235,14 +242,22 @@ Respond with 'relevant' or 'irrelevant' and explain why.""")
         "documents": docs_text
     })
 
-    print(f"\nGrade: {grade_result.relevance.upper()}")
-    print(f"Reasoning: {grade_result.reasoning}")
+    # Handle both Pydantic model instance and potential dict output for robustness
+    if hasattr(grade_result, "relevance"):
+        relevance = grade_result.relevance # type: ignore
+        grade_reasoning = grade_result.reasoning # type: ignore
+    else:
+        relevance = grade_result["relevance"]
+        grade_reasoning = grade_result["reasoning"]
 
-    reasoning = [f"Graded documents as {grade_result.relevance}: {grade_result.reasoning}"]
+    print(f"\nGrade: {relevance.upper()}")
+    print(f"Reasoning: {grade_reasoning}")
+
+    reasoning = [f"Graded documents as {relevance}: {grade_reasoning}"]
 
     return {
         **state,
-        "relevance_grade": grade_result.relevance,
+        "relevance_grade": relevance,
         "reasoning": reasoning
     }
 
@@ -263,7 +278,7 @@ def rewrite_query(state: RAGState) -> RAGState:
     print(f"Original question: {original_question}")
     print(f"Rewrite attempt: {rewrite_count + 1}")
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+    llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
 
     rewrite_prompt = ChatPromptTemplate.from_messages([
         ("system", "You are a query rewriter. Improve the question to get better search results."),
@@ -304,7 +319,7 @@ def generate_answer(state: RAGState) -> RAGState:
     question = state["question"]
     docs = state["retrieved_docs"]
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
     rag_prompt = ChatPromptTemplate.from_messages([
         ("system", """You are a helpful AI assistant. Answer questions based on the provided context.
@@ -364,17 +379,124 @@ def decide_next_step(state: RAGState) -> str:
 
     print(f"\n🤔 ROUTING: relevance={relevance}, rewrites={rewrite_count}")
 
+    # If relevant → generate
     if relevance == "relevant":
         print("   → Going to: generate_answer (docs are good)")
         return "generate"
 
-    elif rewrite_count < max_rewrites:
+    # If still irrelevant and we have remaining rewrites → rewrite
+    if relevance == "irrelevant" and rewrite_count < max_rewrites:
         print(f"   → Going to: rewrite_query (try {rewrite_count + 1}/{max_rewrites})")
         return "rewrite"
 
-    else:
-        print("   → Going to: generate_answer (max rewrites reached)")
-        return "generate"
+    # If we've hit max rewrites and still irrelevant → web search fallback
+    if relevance == "irrelevant" and rewrite_count >= max_rewrites:
+        print("   → Going to: web_search_fallback (exhausted rewrites)")
+        return "web_search"
+
+    # Default safety
+    print("   → Defaulting to generate_answer")
+    return "generate"
+
+
+def web_search_fallback(state: RAGState) -> RAGState:
+    """
+    Fallback Node: Perform web search via Tavily when local KB retrieval failed
+    after allowed rewrites.
+
+    Converts Tavily search results to Document objects and replaces retrieved_docs.
+    """
+
+    print(f"\n{'='*60}")
+    print("🌐  NODE: Web Search Fallback (Tavily)")
+    print(f"{'='*60}")
+
+    question = state["question"]
+    api_key = os.getenv("TAVILY_API_KEY")
+
+    if not api_key:
+        print("WARNING  TAVILY_API_KEY not found. Returning empty docs.")
+        reasoning = ["Web search skipped: missing TAVILY_API_KEY"]
+        return {
+            **state,
+            "retrieved_docs": [],
+            "relevance_grade": "fallback_no_api",
+            "reasoning": reasoning
+        }
+
+    try:
+        if TavilySearch is None:
+            reasoning = ["ERROR: langchain-tavily not installed. Run: pip install -U langchain-tavily"]
+            return {
+                **state,
+                "retrieved_docs": [],
+                "relevance_grade": "fallback_no_tool",
+                "reasoning": reasoning
+            }
+
+        # Використовуємо оновлений TavilySearch tool (langchain-tavily)
+        search_tool = TavilySearch(max_results=3, api_key=api_key)
+
+        raw = search_tool.invoke({"query": question})
+
+        # Normalize different possible return shapes
+        results = []
+        if raw:
+            if isinstance(raw, dict):
+                # Some versions return {'results': [...], 'query': '...'}
+                if 'results' in raw and isinstance(raw['results'], list):
+                    results = raw['results']
+                else:
+                    # Treat dict itself as single result
+                    results = [raw]
+            elif isinstance(raw, list):
+                results = raw
+            else:  # string or other primitive
+                results = [raw]
+
+        docs: List[Document] = []
+        for r in results:
+            if isinstance(r, dict):
+                title = r.get("title") or r.get("name") or "Untitled"
+                url = r.get("url", "")
+                content = r.get("content") or r.get("text") or r.get("snippet") or "No content"
+                page_text = f"{title}\n{content}\nSource: {url}".strip()
+                docs.append(Document(page_content=page_text, metadata={"source": "tavily", "url": url}))
+            else:
+                # Fallback if element is a plain string
+                docs.append(Document(page_content=str(r), metadata={"source": "tavily"}))
+
+        if not docs:
+            print("Tavily returned no usable results")
+            reasoning = ["Web search fallback returned no results"]
+            return {
+                **state,
+                "retrieved_docs": [],
+                "relevance_grade": "web_empty",
+                "reasoning": reasoning
+            }
+
+        print(f"Retrieved {len(docs)} web documents from Tavily")
+        for i, d in enumerate(docs, 1):
+            print(f"  {i}. {d.page_content[:90]}...")
+
+        reasoning = [f"Performed web search fallback: {len(docs)} web docs"]
+
+        return {
+            **state,
+            "retrieved_docs": docs,
+            "relevance_grade": "web_fallback",
+            "reasoning": reasoning
+        }
+    except Exception as e:
+        print(f"ERROR Tavily search failed: {e}")
+        reasoning = [f"Web search error: {e}"]
+        return {
+            **state,
+            "retrieved_docs": [],
+            "relevance_grade": "web_error",
+            "reasoning": reasoning
+        }
 
 
 # ============================================================================
@@ -401,6 +523,7 @@ def create_rag_agent():
     workflow.add_node("grade", grade_documents)
     workflow.add_node("rewrite", rewrite_query)
     workflow.add_node("generate", generate_answer)
+    workflow.add_node("web_search_fallback", web_search_fallback)
 
     # Build graph structure
     workflow.set_entry_point("retrieve")
@@ -412,12 +535,16 @@ def create_rag_agent():
         decide_next_step,
         {
             "generate": "generate",
-            "rewrite": "rewrite"
+            "rewrite": "rewrite",
+            "web_search": "web_search_fallback"
         }
     )
 
     # After rewrite, go back to retrieve
     workflow.add_edge("rewrite", "retrieve")
+
+    # After web search fallback, go directly to generate
+    workflow.add_edge("web_search_fallback", "generate")
 
     # Generate is end
     workflow.add_edge("generate", END)
@@ -430,7 +557,8 @@ def create_rag_agent():
     print("  START → retrieve → grade → [decide]")
     print("                      ↓")
     print("             if relevant: generate → END")
-    print("             if irrelevant: rewrite → retrieve (loop)")
+    print("             if irrelevant & rewrites <2: rewrite → retrieve (loop)")
+    print("             if irrelevant & rewrites >=2: web_search_fallback → generate → END")
     print()
     print("OK RAG Agent compiled with MemorySaver checkpointer\n")
 
@@ -471,9 +599,9 @@ def test_rag_agent():
         print("=" * 70)
 
         # Use unique thread_id for each query to maintain separate sessions
-        config = {"configurable": {"thread_id": f"test_query_{i}"}}
+        config = {"thread_id": f"test_query_{i}"}
 
-        initial_state = {
+        initial_state: RAGState = {
             "question": test["question"],
             "retrieved_docs": [],
             "relevance_grade": "",
@@ -483,7 +611,7 @@ def test_rag_agent():
         }
 
         try:
-            result = agent.invoke(initial_state, config)
+            result = agent.invoke(initial_state, config) # type: ignore
 
             print(f"\n{'='*70}")
             print("FINAL RESULT:")

@@ -166,7 +166,7 @@ class LoggingCallback(BaseCallbackHandler):
 
         print(f"\n{'='*60}")
         print(f"✅ TOOL COMPLETED")
-        print(f"📤 Output: {output.content[:100]}...")
+        print(f"📤 Output: {output[:100]}...")
         print(f"{'='*60}\n")
 
     def get_stats(self):
@@ -286,19 +286,18 @@ class PerformanceCallback(BaseCallbackHandler):
         """Викликається ПІСЛЯ кожного виклику LLM"""
         self.end_time = datetime.now().timestamp()
         print(f"{'='*60}\n")
-        print(f"Виклик LLM тривав: {self.end_time - self.start_time} секунд\n")
+        if self.start_time is not None and self.end_time is not None:
+            print(f"Виклик LLM тривав: {self.end_time - self.start_time} секунд\n")
 
     def on_tool_start(self, serialized: Dict[str, Any], input_str: str, **kwargs: Any) -> None:
         """Викликається ПЕРЕД кожним викликом tool"""
         self.start_time = datetime.now().timestamp()
-        
     def on_tool_end(self, output: str, **kwargs: Any) -> None:
         """Викликається ПІСЛЯ кожного виклику tool"""
         self.end_time = datetime.now().timestamp()
         print(f"{'='*60}\n")
-        print(f"Виклик tool тривав: {self.end_time - self.start_time} секунд\n")
-
-        return output
+        if self.start_time is not None and self.end_time is not None:
+            print(f"Виклик tool тривав: {self.end_time - self.start_time} секунд\n")
         
     def get_stats(self):
         """Повертає статистику часу виконання"""
@@ -362,7 +361,7 @@ Think step-by-step and use tools when needed to answer questions accurately."""
 
 def check_phoenix_http(endpoint="localhost:4317"):
     try:
-        exporter = OTLPSpanExporter(endpoint=endpoint, insecure=True, timeout=2, logging=False)
+        exporter = OTLPSpanExporter(endpoint=endpoint, insecure=True, timeout=2)
         # Спроба виклику — експортер під’єднається до серверу
         exporter.export([])
         return True
