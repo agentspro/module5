@@ -208,7 +208,7 @@ def grade_documents(state: RAGState) -> RAGState:
         relevance: str = Field(description="'relevant' or 'irrelevant'")
         reasoning: str = Field(description="Why this grade")
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatOpenAI(model="gpt-4o", temperature=0)
     structured_llm = llm.with_structured_output(GradeOutput)
 
     grade_prompt = ChatPromptTemplate.from_messages([
@@ -235,14 +235,22 @@ Respond with 'relevant' or 'irrelevant' and explain why.""")
         "documents": docs_text
     })
 
-    print(f"\nGrade: {grade_result.relevance.upper()}")
-    print(f"Reasoning: {grade_result.reasoning}")
+    # Handle both Pydantic model instance and potential dict output for robustness
+    if hasattr(grade_result, "relevance"):
+        relevance = grade_result.relevance # type: ignore
+        grade_reasoning = grade_result.reasoning # type: ignore
+    else:
+        relevance = grade_result["relevance"]
+        grade_reasoning = grade_result["reasoning"]
 
-    reasoning = [f"Graded documents as {grade_result.relevance}: {grade_result.reasoning}"]
+    print(f"\nGrade: {relevance.upper()}")
+    print(f"Reasoning: {grade_reasoning}")
+
+    reasoning = [f"Graded documents as {relevance}: {grade_reasoning}"]
 
     return {
         **state,
-        "relevance_grade": grade_result.relevance,
+        "relevance_grade": relevance,
         "reasoning": reasoning
     }
 
@@ -263,7 +271,7 @@ def rewrite_query(state: RAGState) -> RAGState:
     print(f"Original question: {original_question}")
     print(f"Rewrite attempt: {rewrite_count + 1}")
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+    llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
 
     rewrite_prompt = ChatPromptTemplate.from_messages([
         ("system", "You are a query rewriter. Improve the question to get better search results."),
@@ -304,7 +312,7 @@ def generate_answer(state: RAGState) -> RAGState:
     question = state["question"]
     docs = state["retrieved_docs"]
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
     rag_prompt = ChatPromptTemplate.from_messages([
         ("system", """You are a helpful AI assistant. Answer questions based on the provided context.
@@ -471,9 +479,9 @@ def test_rag_agent():
         print("=" * 70)
 
         # Use unique thread_id for each query to maintain separate sessions
-        config = {"configurable": {"thread_id": f"test_query_{i}"}}
+        config = {"thread_id": f"test_query_{i}"}
 
-        initial_state = {
+        initial_state: RAGState = {
             "question": test["question"],
             "retrieved_docs": [],
             "relevance_grade": "",
@@ -483,7 +491,7 @@ def test_rag_agent():
         }
 
         try:
-            result = agent.invoke(initial_state, config)
+            result = agent.invoke(initial_state, config) # type: ignore
 
             print(f"\n{'='*70}")
             print("FINAL RESULT:")

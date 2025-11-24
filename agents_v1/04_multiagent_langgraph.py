@@ -22,6 +22,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 import operator
+from langchain_core.runnables import RunnableConfig
 
 load_dotenv()
 
@@ -250,15 +251,15 @@ What's the next step?"""
     structured_llm = llm.with_structured_output(SupervisorDecision)
     decision = structured_llm.invoke(messages)
 
-    print(f"\nSUPERVISOR Decision: {decision.next_agent}")
-    print(f"💭 Reasoning: {decision.reasoning}\n")
+    print(f"\nSUPERVISOR Decision: {decision['next_agent']}")
+    print(f"💭 Reasoning: {decision['reasoning']}\n")
 
     return {
         **state,
-        "current_agent": decision.next_agent,
-        "supervisor_decision": decision.reasoning,
+        "current_agent": decision["next_agent"],
+        "supervisor_decision": decision["reasoning"],
         "iteration_count": iteration,
-        "messages": [AIMessage(content=f"Supervisor → {decision.next_agent}: {decision.reasoning}")]
+        "messages": [AIMessage(content=f"Supervisor → {decision['next_agent']}: {decision['reasoning']}")]
     }
 
 
@@ -296,14 +297,14 @@ Are these documents sufficient?"""
     structured_llm = llm.with_structured_output(ResearchQuality)
     quality = structured_llm.invoke([HumanMessage(content=quality_prompt)])
 
-    print(f"\nOK Quality: {'Sufficient' if quality.is_sufficient else 'Insufficient'}")
-    print(f"SUPERVISOR Confidence: {quality.confidence:.2f}")
-    print(f"💭 Reasoning: {quality.reasoning}\n")
+    print(f"\nOK Quality: {'Sufficient' if quality['is_sufficient'] else 'Insufficient'}")
+    print(f"SUPERVISOR Confidence: {quality['confidence']:.2f}")
+    print(f"💭 Reasoning: {quality['reasoning']}\n")
 
     return {
         **state,
         "retrieved_docs": retrieved_docs,
-        "messages": [AIMessage(content=f"Researcher: Found {len(retrieved_docs)} docs (confidence: {quality.confidence:.2f})")]
+        "messages": [AIMessage(content=f"Researcher: Found {len(retrieved_docs)} docs (confidence: {quality['confidence']:.2f})")]
     }
 
 
@@ -363,7 +364,7 @@ Provide a structured analysis with:
 
     return {
         **state,
-        "analysis": analysis,
+        "analysis": analysis, # type: ignore
         "messages": [AIMessage(content=f"Analyzer: Completed analysis ({len(analysis)} chars)")]
     }
 
@@ -415,7 +416,7 @@ Create a clear, informative answer that:
 
     return {
         **state,
-        "final_answer": final_answer,
+        "final_answer": final_answer, # type: ignore
         "messages": [AIMessage(content=f"Synthesizer: Created final answer ({len(final_answer)} chars)")]
     }
 
@@ -531,14 +532,26 @@ def test_multiagent_system():
             "supervisor_decision": "",
             "iteration_count": 0
         }
-
         # Виконуємо з checkpointing
-        config = {"configurable": {"thread_id": f"test_{i}"}}
+        config: RunnableConfig = {"configurable": {"thread_id": f"test_{i}"}}
+
+        # Convert initial_state dict to MultiAgentState
+        initial_state_typed: MultiAgentState = MultiAgentState(
+            messages=initial_state["messages"],
+            question=initial_state["question"],
+            current_agent=initial_state["current_agent"],
+            retrieved_docs=initial_state["retrieved_docs"],
+            analysis=initial_state["analysis"],
+            final_answer=initial_state["final_answer"],
+            supervisor_decision=initial_state["supervisor_decision"],
+            iteration_count=initial_state["iteration_count"]
+        )
 
         try:
             # Stream результатів
-            for event in app.stream(initial_state, config):
+            for event in app.stream(initial_state_typed, config):
                 agent_name = list(event.keys())[0]
+                print(f"\n📍 Event from: {agent_name}")
                 print(f"\n📍 Event from: {agent_name}")
 
             # Отримуємо фінальний state
