@@ -14,10 +14,17 @@ LangSmith Integration: Автоматично ввімкнений через en
 
 import os
 import requests
+import re
+import socket
 from langchain.tools import tool  # Офіційний імпорт згідно LangChain docs
 from langchain_community.tools.tavily_search import TavilySearchResults
 from dotenv import load_dotenv
 import numexpr as ne
+try:
+    import dns.resolver  # dnspython for MX/A lookup
+    _dns_available = True
+except ImportError:
+    _dns_available = False
 
 # LangChain 1.0 API
 from langchain.agents import create_agent
@@ -167,6 +174,99 @@ def web_search(query: str) -> str:
         return f"Error searching web: {str(e)}"
 
 
+@tool
+def validate_email(email: str) -> str:
+    """
+    Validate an email address using regex and DNS lookup.
+
+    Steps:
+    1. Regex pattern validation (RFC-like simplified)
+    2. Domain extraction
+    3. DNS MX record lookup (fallback to A record if MX not found)
+
+    Args:
+        email: Email address string (e.g., 'user@example.com')
+
+    Returns:
+        Multi-line validation report indicating validity and discovered DNS info.
+
+    Notes:
+    - Regex is a pragmatic pattern (not full RFC 5322 coverage)
+    - DNS lookup requires 'dnspython' package; if unavailable, falls back to socket resolution
+    - Absence of MX and A records marks domain as invalid
+    """
+    email = email.strip()
+
+    pattern = r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
+    if not re.match(pattern, email):
+        return (
+            "Email Validation Report:\n"
+            f"Input: {email}\n"
+            "Status: INVALID\n"
+            "Reason: Regex pattern mismatch (basic format invalid)."
+        )
+
+    local_part, domain = email.rsplit("@", 1)
+    report_lines = [
+        "Email Validation Report:",
+        f"Input: {email}",
+        "Step 1: Regex OK",\
+        f"Local Part: {local_part}",
+        f"Domain: {domain}",
+    ]
+
+    mx_records = []
+    a_records = []
+    dns_errors = []
+
+    # DNS MX lookup
+    if _dns_available:
+        try:
+            answers = dns.resolver.resolve(domain, 'MX')
+            for rdata in answers:
+                mx_records.append(str(rdata.exchange).rstrip('.'))
+        except Exception as e:
+            dns_errors.append(f"MX lookup failed: {e}")
+        # Fallback A record
+        if not mx_records:
+            try:
+                answers_a = dns.resolver.resolve(domain, 'A')
+                for rdata in answers_a:
+                    a_records.append(rdata.address)
+            except Exception as e:
+                dns_errors.append(f"A lookup failed: {e}")
+    else:
+        report_lines.append("DNS library (dnspython) not installed; using socket fallback.")
+        try:
+            ip = socket.gethostbyname(domain)
+            a_records.append(ip)
+        except Exception as e:
+            dns_errors.append(f"Socket resolution failed: {e}")
+
+    if mx_records:
+        report_lines.append("Step 2: MX records found")
+        for mx in mx_records:
+            report_lines.append(f"  MX: {mx}")
+    elif a_records:
+        report_lines.append("Step 2: No MX - A record fallback successful")
+        for ip in a_records:
+            report_lines.append(f"  A: {ip}")
+    else:
+        report_lines.append("Step 2: Domain resolution FAILED (no MX/A)")
+
+    if dns_errors:
+        report_lines.append("DNS Errors:")
+        for err in dns_errors:
+            report_lines.append(f"  - {err}")
+
+    is_valid = bool(mx_records or a_records)
+    report_lines.append(f"Final Status: {'VALID' if is_valid else 'INVALID'}")
+    if not is_valid:
+        report_lines.append("Reason: Domain does not resolve (no usable DNS records).")
+
+    return "\n".join(report_lines)
+
+
 # ============================================================================
 # СТВОРЕННЯ БАЗОВОГО АГЕНТА - LangChain 1.0 API
 # ============================================================================
@@ -182,7 +282,7 @@ def create_basic_agent():
     print("=" * 70 + "\n")
 
     # 1. Список реальних tools
-    tools = [get_weather, calculate, web_search]
+    tools = [get_weather, calculate, web_search, validate_email]
 
     print("Available tools (REAL APIs):")
     for tool_item in tools:
@@ -220,6 +320,10 @@ def test_basic_agent():
 
     # Тестові запити що використовують реальні API
     test_queries = [
+        {
+            "query": "Is test@example.com a valid email?",
+            "expected_tool": "validate_email"
+        },
         {
             "query": "What's the current weather in London?",
             "expected_tool": "get_weather"
