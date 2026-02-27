@@ -42,6 +42,8 @@ else:
     print("WARNING  LangSmith не ввімкнений\n")
 
 
+GLOBAL_RETRIEVER = None  # initialized in test_rag_agent()
+
 # ============================================================================
 # KNOWLEDGE BASE - Створюємо векторну базу для RAG
 # ============================================================================
@@ -312,13 +314,12 @@ def generate_answer(state: RAGState) -> RAGState:
 Context:
 {context}
 
-Question: {question}
-
 Instructions:
 - Use ONLY information from the context
 - Be concise and accurate
 - If context doesn't contain the answer, say so
 - Include relevant details and examples"""),
+        ("human", "{question}"),
     ])
 
     # Format context

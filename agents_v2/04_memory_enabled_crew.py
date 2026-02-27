@@ -170,7 +170,7 @@ def create_memory_enabled_crew():
         process=Process.sequential,
         verbose=True,
         memory=True,  # Enable memory
-        embedding_model={
+        embedder={
             "provider": "openai",
             "config": {
                 "model": "text-embedding-3-small"
@@ -295,7 +295,7 @@ def example_learning_preferences():
         process=Process.sequential,
         verbose=True,
         memory=True,
-        embedding_model={
+        embedder={
             "provider": "openai",
             "config": {"model": "text-embedding-3-small"}
         }
@@ -394,7 +394,7 @@ EMBEDDING MODEL CONFIGURATION:
 CrewAI uses embeddings to store and retrieve memories:
 
 ```python
-embedding_model={
+embedder={
     "provider": "openai",  # or "cohere", "huggingface"
     "config": {
         "model": "text-embedding-3-small"
@@ -442,7 +442,7 @@ While CrewAI handles memory automatically, you can:
    ```python
    crew = Crew(
        ...,
-       embedding_model={"provider": "openai", "config": {...}}
+       embedder={"provider": "openai", "config": {...}}
    )
    ```
 

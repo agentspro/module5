@@ -8,14 +8,14 @@ LangSmith Integration: Автоматично ввімкнений через en
 
 РЕАЛЬНІ ІНСТРУМЕНТИ:
 - Weather: OpenWeatherMap API
-- Search: Tavily Search API
+- Search: DuckDuckGo Search (ddgs)
 - Calculator: Безпечний numexpr
 """
 
 import os
 import requests
-from langchain.tools import tool  # Офіційний імпорт згідно LangChain docs
-from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_core.tools import tool
+from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 import numexpr as ne
 
@@ -118,7 +118,7 @@ def calculate(expression: str) -> str:
 @tool
 def web_search(query: str) -> str:
     """
-    Search the web for current information using Tavily Search API.
+    Search the web for current information using DuckDuckGo Search.
 
     Args:
         query: Search query
@@ -128,22 +128,9 @@ def web_search(query: str) -> str:
 
     Use when user asks about current events, news, or information that needs web lookup.
     """
-    api_key = os.getenv("TAVILY_API_KEY")
-
-    if not api_key:
-        return (
-            "ERROR: TAVILY_API_KEY not found. "
-            "Get free API key at https://tavily.com"
-        )
-
     try:
-        # Використовуємо Tavily для пошуку
-        search_tool = TavilySearchResults(
-            max_results=3,
-            api_key=api_key
-        )
-
-        results = search_tool.invoke({"query": query})
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=3))
 
         if not results:
             return f"No results found for '{query}'"
@@ -152,8 +139,8 @@ def web_search(query: str) -> str:
         formatted_results = []
         for i, result in enumerate(results, 1):
             title = result.get('title', 'No title')
-            url = result.get('url', '')
-            content = result.get('content', 'No description')
+            url = result.get('href', '')
+            content = result.get('body', 'No description')
 
             formatted_results.append(
                 f"{i}. {title}\n"
@@ -199,7 +186,7 @@ def create_basic_agent():
 
 You have access to:
 - Real-time weather data via OpenWeatherMap API
-- Web search via Tavily API for current information
+- Web search via DuckDuckGo for current information
 - Safe calculator for mathematical operations
 
 Use the appropriate tool for each request and provide accurate, helpful responses.
@@ -282,7 +269,7 @@ if __name__ == "__main__":
     print("Features:")
     print("  OK create_agent - LangChain 1.0 API (October 2025)")
     print("  OK Real Weather API - OpenWeatherMap")
-    print("  OK Real Web Search - Tavily API")
+    print("  OK Real Web Search - DuckDuckGo")
     print("  OK Safe Calculator - numexpr")
     print("  OK LangSmith automatic tracing")
     print("  OK Direct agent invocation (no AgentExecutor)")
@@ -293,7 +280,6 @@ if __name__ == "__main__":
     required_keys = {
         "OPENAI_API_KEY": "https://platform.openai.com/api-keys",
         "OPENWEATHERMAP_API_KEY": "https://openweathermap.org/api",
-        "TAVILY_API_KEY": "https://tavily.com"
     }
 
     missing_keys = []

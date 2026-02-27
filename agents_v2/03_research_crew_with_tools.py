@@ -24,7 +24,7 @@ from crewai_tools import (
     FileReadTool,
     DirectoryReadTool,
 )
-from langchain.tools import tool
+from langchain_core.tools import tool
 from typing import Dict, Any
 import json
 
@@ -104,19 +104,14 @@ def create_research_crew():
         Crew: Research crew with tools
     """
 
-    # Web search tool using Tavily (REAL API)
-    from langchain_community.tools.tavily_search import TavilySearchResults
+    # Web search tool using DuckDuckGo (no API key needed)
+    from langchain_community.tools import DuckDuckGoSearchResults
 
-    tavily_api_key = os.getenv("TAVILY_API_KEY")
-    if not tavily_api_key:
-        print("WARNING: TAVILY_API_KEY not found. Web search will not be available.")
-        print("Get free API key at: https://tavily.com\n")
+    try:
+        search_tool = DuckDuckGoSearchResults(num_results=5)
+    except Exception:
+        print("WARNING: DuckDuckGo search tool could not be initialized.")
         search_tool = None
-    else:
-        search_tool = TavilySearchResults(
-            max_results=5,
-            api_key=tavily_api_key
-        )
 
     # Define agents with specific tools
     researcher = Agent(
@@ -270,11 +265,11 @@ def main():
     print()
 
     # NOTE: This crew uses REAL tools:
-    # - Web search via Tavily API for current information
+    # - Web search via DuckDuckGo for current information
     # - File reading/directory tools for local data
     # - Data analysis and calculation tools
     print("Using REAL APIs (no sample/mock data):")
-    print("  - Tavily Search for web research")
+    print("  - DuckDuckGo Search for web research")
     print("  - File I/O tools for document analysis")
     print("  - Data analysis tools for metrics")
     print()

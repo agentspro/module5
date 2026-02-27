@@ -147,23 +147,26 @@ documents = [
 print(f"KB: Knowledge Base: {len(documents)} документів про LangGraph 1.0\n")
 
 # ============================================================================
-# VECTOR STORE SETUP
+# VECTOR STORE & LLM SETUP (lazy initialization)
 # ============================================================================
 
-embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-vectorstore = FAISS.from_documents(documents, embeddings)
-retriever = vectorstore.as_retriever(
-    search_type="similarity",
-    search_kwargs={"k": 3}  # Топ-3 документи
-)
+retriever = None
+llm = None
 
-print("OK Vector store готовий (FAISS)\n")
 
-# ============================================================================
-# LLM SETUP
-# ============================================================================
-
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+def _init_resources():
+    """Initialize vector store and LLM (requires OPENAI_API_KEY)."""
+    global retriever, llm
+    if retriever is not None:
+        return
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+    vectorstore = FAISS.from_documents(documents, embeddings)
+    retriever = vectorstore.as_retriever(
+        search_type="similarity",
+        search_kwargs={"k": 3}  # Топ-3 документи
+    )
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    print("OK Vector store готовий (FAISS)\n")
 
 # ============================================================================
 # PYDANTIC MODELS для structured output
@@ -456,6 +459,8 @@ def create_multiagent_system():
     print("=" * 70)
     print("BUILDING  СТВОРЕННЯ МУЛЬТИАГЕНТНОЇ СИСТЕМИ")
     print("=" * 70 + "\n")
+
+    _init_resources()
 
     # Створюємо StateGraph
     workflow = StateGraph(MultiAgentState)

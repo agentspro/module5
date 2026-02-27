@@ -1,6 +1,5 @@
 # LangChain 1.0 - Core libraries
 langchain>=1.0.0,<2.0.0
-langchain-core>=1.0.0,<2.0.0
 langchain-openai>=1.0.0
 langchain-community>=0.4.0
 
@@ -22,7 +21,7 @@ python-dotenv>=1.0.0
 # Real API integrations
 requests>=2.31.0
 numexpr>=2.8.0
-tavily-python>=0.3.0
+duckduckgo-search>=7.0.0
 yfinance>=0.2.0
 
 # Optional: LangSmith SDK (automatically included with langchain>=1.0)
