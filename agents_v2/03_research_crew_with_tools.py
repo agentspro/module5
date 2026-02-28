@@ -24,7 +24,7 @@ from crewai_tools import (
     FileReadTool,
     DirectoryReadTool,
 )
-from langchain_core.tools import tool
+from crewai.tools import tool
 from typing import Dict, Any
 import json
 
@@ -36,8 +36,8 @@ if not os.getenv("OPENAI_API_KEY"):
     raise ValueError("OPENAI_API_KEY not found in environment variables")
 
 
-# Custom tools using @tool decorator (CORRECT LangChain API)
-@tool
+# Custom tools using @tool decorator (CrewAI native API)
+@tool("analyze_data")
 def analyze_data(data_json: str) -> str:
     """Analyze JSON data and return statistical insights. Input should be a valid JSON string."""
     try:
@@ -75,7 +75,7 @@ def analyze_data(data_json: str) -> str:
         return f"Error analyzing data: {str(e)}"
 
 
-@tool
+@tool("calculate_metrics")
 def calculate_metrics(expression: str) -> str:
     """Safely evaluate mathematical expressions. Input should be a Python expression like '2 + 2' or 'sum([1,2,3])'."""
     try:
@@ -104,14 +104,27 @@ def create_research_crew():
         Crew: Research crew with tools
     """
 
-    # Web search tool using DuckDuckGo (no API key needed)
-    from langchain_community.tools import DuckDuckGoSearchResults
+    # Web search tool using DuckDuckGo (no API key needed, CrewAI-native)
+    from duckduckgo_search import DDGS
 
-    try:
-        search_tool = DuckDuckGoSearchResults(num_results=5)
-    except Exception:
-        print("WARNING: DuckDuckGo search tool could not be initialized.")
-        search_tool = None
+    @tool("web_search")
+    def web_search(query: str) -> str:
+        """Search the web for current information using DuckDuckGo. Input should be a search query string."""
+        try:
+            with DDGS() as ddgs:
+                results = list(ddgs.text(query, max_results=5))
+            if not results:
+                return f"No results found for '{query}'"
+            formatted = []
+            for i, r in enumerate(results, 1):
+                title = r.get('title', 'No title')
+                body = r.get('body', '')[:200]
+                formatted.append(f"{i}. {title}\n   {body}")
+            return "\n\n".join(formatted)
+        except Exception as e:
+            return f"Error searching web: {str(e)}"
+
+    search_tool = web_search
 
     # Define agents with specific tools
     researcher = Agent(
@@ -126,7 +139,8 @@ def create_research_crew():
         tools=[
             file_read_tool,
             directory_read_tool,
-        ] + ([search_tool] if search_tool else []),
+            search_tool,
+        ],
         verbose=True,
         allow_delegation=False,
         llm="gpt-4o-mini"
@@ -311,7 +325,7 @@ def example_with_custom_tools():
     Example showing custom tool creation with @tool decorator.
     """
 
-    @tool
+    @tool("custom_formatter")
     def custom_formatter(text: str) -> str:
         """Format text to uppercase."""
         return text.upper()

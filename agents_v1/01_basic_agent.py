@@ -15,7 +15,7 @@ LangSmith Integration: Автоматично ввімкнений через en
 import os
 import requests
 from langchain_core.tools import tool
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from dotenv import load_dotenv
 import numexpr as ne
 
